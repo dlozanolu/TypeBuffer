@@ -1,0 +1,16 @@
+---
+description: Project Language Policy
+alwaysApply: true
+---
+
+# Project Language Policy
+
+- **English Only**: You must only use English for any changes made to this project. This includes:
+  - Source code variables, classes, functions.
+  - Comments and docstrings.
+  - Shell scripts and batch files.
+  - Log messages and user-facing output strings.
+  - Markdown files (README.md, CONTRIBUTING.md).
+  - Commit messages.
+- If a user asks a question in another language (e.g., Spanish), you may reply to them in their language to be polite, but the code modifications and file writings MUST remain strictly in English.
+- Do not mix languages within the project files.

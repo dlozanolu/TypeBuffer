@@ -1,9 +1,14 @@
-# Seguridad / secretos
-Si abres un PR, no subas API keys ni logs con texto personal.
+# Contributing
 
-# Cambios
-- Mantén el alcance pequeño y describe el *por qué* en el PR.
-- Prueba en Windows el hook (atajos, flechas, tildes, `?`/`¿`) si tocas `TypeBuffer.py`.
+## Security / Secrets
+If you open a Pull Request, do NOT commit API keys, personal tokens, or logs containing personal text.
 
-# Estilo
-- Python 3.10+, sin dependencias pesadas salvo las de `requirements.txt`.
+## Changes
+- Keep the scope small and describe *why* the change is needed in the PR description.
+- Test the hook on Windows (shortcuts, arrows, dead keys like `´` or `~`) if you modify `TypeBuffer.py`.
+
+## Language Policy
+- **English Only**: All code, documentation, comments, issues, and PR descriptions must be written in English.
+
+## Style
+- Python 3.10+, avoid heavy dependencies other than those strictly needed in `requirements.txt`.

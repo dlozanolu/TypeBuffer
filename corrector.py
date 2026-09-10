@@ -1,10 +1,10 @@
 """
-Corrector ortográfico/gramatical con contexto de frase o párrafo.
+Spell and grammar checker with sentence/paragraph context.
 
-Proveedores:
-  - languagetool (default): API pública o servidor local
-  - openai: LLM si hay OPENAI_API_KEY (mejor estilo/contexto)
-  - none: sin corrección
+Providers:
+  - languagetool (default): Public API or local server
+  - openai: LLM if OPENAI_API_KEY is present (better style/context)
+  - none: no checking
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def correct_text(
     text: str,
     *,
     provider: str = "languagetool",
-    language: str = "es",
+    language: str = "en",
     timeout: float = 8.0,
 ) -> str:
     text = text or ""
@@ -38,15 +38,15 @@ def correct_text(
             return _correct_openai(text, language=language, timeout=timeout)
         if provider == "languagetool":
             return _correct_languagetool(text, language=language, timeout=timeout)
-        log.warning("Proveedor desconocido %r; se envia sin corregir", provider)
+        log.warning("Unknown provider %r; skipping correction", provider)
         return text
     except Exception as exc:
-        log.warning("Corrector fallo (%s); se envia texto original", exc)
+        log.warning("Spellchecker failed (%s); returning original text", exc)
         return text
 
 
 def _correct_languagetool(text: str, *, language: str, timeout: float) -> str:
-    """Aplica sugerencias de LanguageTool sobre el texto completo (contexto de frase)."""
+    """Applies LanguageTool suggestions over the complete text (sentence context)."""
     endpoint = os.environ.get("LANGUAGETOOL_URL", LT_PUBLIC)
     data = urllib.parse.urlencode(
         {
@@ -69,7 +69,7 @@ def _correct_languagetool(text: str, *, language: str, timeout: float) -> str:
     if not matches:
         return text
 
-    # Aplicar de atrás hacia adelante para no desplazar offsets
+    # Apply backwards to avoid messing up offsets
     out = text
     for m in sorted(matches, key=lambda x: x["offset"], reverse=True):
         reps = m.get("replacements") or []
@@ -88,13 +88,13 @@ def _correct_languagetool(text: str, *, language: str, timeout: float) -> str:
 def _correct_openai(text: str, *, language: str, timeout: float) -> str:
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        log.warning("OPENAI_API_KEY no definida; fallback a LanguageTool")
+        log.warning("OPENAI_API_KEY is not set; falling back to LanguageTool")
         return _correct_languagetool(text, language=language, timeout=timeout)
 
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
     base = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 
-    lang_name = {"es": "español", "en": "English", "fr": "français", "de": "Deutsch"}.get(
+    lang_name = {"es": "Spanish", "en": "English", "fr": "French", "de": "German"}.get(
         language, language
     )
     body = {
@@ -104,11 +104,11 @@ def _correct_openai(text: str, *, language: str, timeout: float) -> str:
             {
                 "role": "system",
                 "content": (
-                    f"Eres un corrector ortográfico y gramatical en {lang_name}. "
-                    "Corrige SOLO errores ortográficos, tildes, puntuación y gramática "
-                    "teniendo en cuenta la frase o párrafo completo. "
-                    "No cambies el significado, tono ni añadas contenido. "
-                    "Devuelve ÚNICAMENTE el texto corregido, sin comillas ni explicaciones."
+                    f"You are a spelling and grammar checker for {lang_name}. "
+                    "ONLY correct spelling, punctuation, and grammar mistakes "
+                    "taking into account the whole sentence or paragraph. "
+                    "Do NOT change the meaning, tone, or add new content. "
+                    "Return ONLY the corrected text, without quotes or explanations."
                 ),
             },
             {"role": "user", "content": text},
@@ -127,7 +127,7 @@ def _correct_openai(text: str, *, language: str, timeout: float) -> str:
         payload = json.loads(resp.read().decode("utf-8"))
 
     out = payload["choices"][0]["message"]["content"].strip()
-    # Quitar comillas envolventes accidentales
+    # Strip accidental surrounding quotes
     if len(out) >= 2 and out[0] == out[-1] and out[0] in "\"'":
         out = out[1:-1]
     if out != text:

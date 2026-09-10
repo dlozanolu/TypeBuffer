@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeBuffer - Masked Typing</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #c9d1d9;
+            --accent-color: #58a6ff;
+            --border-color: #30363d;
+            --card-bg: #161b22;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            padding: 4rem 2rem;
+            max-width: 800px;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 0.5rem;
+            color: #ffffff;
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: #8b949e;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #238636;
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            border: 1px solid rgba(240, 246, 252, 0.1);
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #2ea043;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border-color: var(--border-color);
+            color: var(--accent-color);
+            margin-left: 1rem;
+        }
+
+        .btn-outline:hover {
+            background-color: var(--border-color);
+        }
+
+        main {
+            max-width: 900px;
+            padding: 2rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .feature-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+        }
+
+        .feature-card h3 {
+            color: var(--accent-color);
+            margin-top: 0;
+        }
+
+        .terminal {
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+            overflow-x: auto;
+            margin: 2rem 0;
+        }
+
+        .terminal-code {
+            color: #e6edf3;
+        }
+        
+        .terminal-prompt {
+            color: #7ee787;
+        }
+
+        footer {
+            margin-top: 4rem;
+            padding: 2rem;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            width: 100%;
+            color: #8b949e;
+        }
+        
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>TypeBuffer</h1>
+    <p class="subtitle">Masked typing mode for your desktop. Type freely, auto-correct grammar, and dump the text in one go.</p>
+    <a href="https://github.com/dlozanolu/TypeBuffer/releases" class="btn">Download Latest Release</a>
+    <a href="https://github.com/dlozanolu/TypeBuffer" class="btn btn-outline">View on GitHub</a>
+</header>
+
+<main>
+    <h2>How it works</h2>
+    <p>
+        TypeBuffer intercepts your keyboard input silently. Nothing appears on your screen as you type. 
+        Once you stop typing for <strong>1.5 seconds</strong>, TypeBuffer automatically flushes the text you typed into your active window.
+        Instant passthrough ensures that shortcuts (Ctrl+C, Ctrl+V), arrow keys, and system keys work flawlessly without any delay.
+    </p>
+
+    <div class="features">
+        <div class="feature-card">
+            <h3>🔒 Ghost Typing</h3>
+            <p>Hide your typing process. Think, pause, and let your complete sentence appear at once.</p>
+        </div>
+        <div class="feature-card">
+            <h3>✨ Auto Spellchecker</h3>
+            <p>Integrated with LanguageTool and OpenAI. It checks the grammar of your complete sentence <em>before</em> sending it to the app.</p>
+        </div>
+        <div class="feature-card">
+            <h3>🚀 Run at Startup</h3>
+            <p>Includes a cross-platform autostart script. Set it up once and forget about it. Perfect for daily workflows.</p>
+        </div>
+        <div class="feature-card">
+            <h3>💻 Cross-Platform</h3>
+            <p>Native low-level hooks on Windows for perfect shortcut passthrough, with pynput support for macOS and Linux.</p>
+        </div>
+    </div>
+
+    <h2>Getting Started</h2>
+    <div class="terminal">
+<span class="terminal-prompt">$</span> <span class="terminal-code">pip install -r requirements.txt</span><br>
+<span class="terminal-prompt">$</span> <span class="terminal-code">python TypeBuffer.py</span><br>
+<br>
+<span class="terminal-code">2026-09-10 18:00:00 MASKED MODE (timeout=1.5s). ESC to exit.</span><br>
+<span class="terminal-code">2026-09-10 18:00:00 Instant pass-through: arrows, Caps Lock, Ctrl+C/V, Alt, Win, Del, F-keys...</span>
+    </div>
+
+    <h2>Enable Auto-Start</h2>
+    <p>Set up TypeBuffer to run automatically when you log into your system:</p>
+    <div class="terminal">
+<span class="terminal-prompt">$</span> <span class="terminal-code">python setup_autostart.py --install</span>
+    </div>
+</main>
+
+<footer>
+    <p>Open Source under the <a href="https://github.com/dlozanolu/TypeBuffer/blob/main/LICENSE">MIT License</a>. Created by David Lozano Lucas.</p>
+</footer>
+
+</body>
+</html>

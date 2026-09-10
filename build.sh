@@ -6,5 +6,5 @@ python3 -m pip install -r requirements-dev.txt
 python3 -m PyInstaller --noconfirm --clean --onefile --noconsole --name TypeBuffer TypeBuffer.py
 
 echo
-echo "OK: dist/TypeBuffer"
-echo "Autostart: python3 install_autostart.py --install"
+echo "SUCCESS: dist/TypeBuffer"
+echo "Autostart: python3 setup_autostart.py --install"

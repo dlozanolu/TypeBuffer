@@ -1,9 +1,9 @@
 """
-Instala / desinstala TypeBuffer al iniciar sesión del usuario.
+Installs / uninstalls TypeBuffer at user login.
 
-No es un servicio de Windows (Session 0): esos no ven el teclado del escritorio.
-Equivalente correcto:
-  - Windows: carpeta Inicio (Startup)
+This is not a Windows Service (Session 0) as services cannot see desktop keyboard input.
+Correct approach:
+  - Windows: Startup folder
   - Linux:   ~/.config/autostart/*.desktop
   - macOS:   ~/Library/LaunchAgents/*.plist
 """
@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent
 
 
 def resolve_target() -> Path:
-    """Prefiere el binario compilado; si no, el script .py."""
+    """Prefers the compiled binary; otherwise, falls back to the .py script."""
     system = platform.system()
     if system == "Windows":
         exe = ROOT / "dist" / f"{APP_NAME}.exe"
@@ -51,7 +51,7 @@ def install_windows(target: Path) -> Path:
     startup.mkdir(parents=True, exist_ok=True)
     bat = startup / f"{APP_NAME}.bat"
     cmd = run_command(target)
-    # start sin ventana de consola molesta si es .exe; el .bat queda mínimo
+    # start without annoying console window if it's .exe; the .bat remains minimal
     if target.suffix.lower() == ".exe":
         bat.write_text(
             f'@echo off\r\nstart "" "{target}" --quiet\r\n',
@@ -142,10 +142,10 @@ def uninstall_macos() -> Path | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=f"Autostart de {APP_NAME} (multiplataforma)")
+    parser = argparse.ArgumentParser(description=f"Autostart setup for {APP_NAME} (cross-platform)")
     g = parser.add_mutually_exclusive_group(required=True)
-    g.add_argument("--install", action="store_true", help="Instalar arranque al login")
-    g.add_argument("--uninstall", action="store_true", help="Quitar arranque al login")
+    g.add_argument("--install", action="store_true", help="Install autostart at login")
+    g.add_argument("--uninstall", action="store_true", help="Remove autostart at login")
     args = parser.parse_args()
 
     system = platform.system()
@@ -153,7 +153,7 @@ def main() -> int:
 
     if args.install:
         if not target.exists():
-            print(f"No encontrado: {target}")
+            print(f"Target not found: {target}")
             return 1
         if system == "Windows":
             path = install_windows(target)
@@ -162,11 +162,11 @@ def main() -> int:
         elif system == "Darwin":
             path = install_macos(target)
         else:
-            print(f"Sistema no soportado: {system}")
+            print(f"Unsupported system: {system}")
             return 1
-        print(f"Instalado autostart -> {path}")
-        print(f"Objetivo: {target}")
-        print("Reinicia sesion (o ejecuta el acceso) para probarlo.")
+        print(f"Autostart installed -> {path}")
+        print(f"Target: {target}")
+        print("Restart your session (or execute the shortcut) to test it.")
         return 0
 
     if system == "Windows":
@@ -176,10 +176,10 @@ def main() -> int:
     elif system == "Darwin":
         path = uninstall_macos()
     else:
-        print(f"Sistema no soportado: {system}")
+        print(f"Unsupported system: {system}")
         return 1
 
-    print(f"Eliminado: {path}" if path else "No habia nada instalado.")
+    print(f"Removed: {path}" if path else "Nothing was installed.")
     return 0
 
 

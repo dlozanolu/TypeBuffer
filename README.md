@@ -1,67 +1,66 @@
 # TypeBuffer
 
-Teclado en modo máscara: escribes sin que se vea nada en pantalla y, tras una pausa, el texto se vuelca de golpe en la ventana activa. Opcionalmente lo pasa por un corrector ortográfico/gramatical con contexto de frase.
+TypeBuffer is a masked keyboard input tool. It lets you type without anything appearing on the screen immediately, and after a brief pause, the accumulated text is dumped at once into the active window. Optionally, it passes your text through a spell and grammar checker with full sentence context before outputting it.
 
-## Qué hace
+## Features
 
-- **Enmascara** la escritura normal (letras, signos, espacios…)
-- Tras **2 segundos** sin teclear, escribe el buffer en la app en foco
-- **Corrector** opcional (LanguageTool u OpenAI) sobre la frase/párrafo completo
-- **Pasan al instante** (sin delay): flechas, Bloq Mayús, Ctrl+C/V, Alt, Win, Supr, F-keys…
+- **Masks** normal typing (letters, symbols, spaces...).
+- After **1.5 seconds** of inactivity, it outputs the buffer into the active application.
+- **Spellchecker** (optional, uses LanguageTool or OpenAI) that corrects the full sentence or paragraph.
+- **Instant passthrough**: arrow keys, Caps Lock, Ctrl+C/Ctrl+V, Alt, Win, Del, F-keys, etc. are passed instantly without delay.
 
-> En Windows usa un hook de teclado de bajo nivel con bloqueo selectivo.  
-> Un *servicio* de Windows (Session 0) no puede capturar el teclado del escritorio; usa arranque al iniciar sesión.
+> **Note for Windows:** It uses a low-level `WH_KEYBOARD_LL` hook with selective blocking. A Windows *Service* (Session 0) cannot capture the desktop keyboard; use the included autostart script to run it at user login instead.
 
-## Requisitos
+## Requirements
 
 - Python 3.10+
-- Windows 10/11 (recomendado), también macOS/Linux con limitaciones
-- Dependencia: `pynput`
+- Windows 10/11 (recommended), also works on macOS/Linux with some limitations.
+- Dependency: `pynput`
 
-## Instalación rápida
+## Quick Install
 
 ```bash
 pip install -r requirements.txt
 python TypeBuffer.py
 ```
 
-En Windows también puedes usar `TypeBuffer.bat`.
+On Windows, you can also use `TypeBuffer.bat`.
 
-## Uso
+## Usage
 
 ```bash
 python TypeBuffer.py
-python TypeBuffer.py --timeout 2
-python TypeBuffer.py --corrector languagetool --lang es
+python TypeBuffer.py --timeout 1.5
+python TypeBuffer.py --corrector languagetool --lang en
 python TypeBuffer.py --corrector openai
 python TypeBuffer.py --corrector none
 python TypeBuffer.py --quiet
 ```
 
-| Opción | Descripción |
+| Option | Description |
 |--------|-------------|
-| `--timeout` | Segundos de pausa antes de volcar (default: 2) |
-| `--corrector` | `languagetool` (default), `openai` o `none` |
-| `--lang` | Idioma del corrector (default: `es`) |
-| `--quiet` | Solo log a archivo (útil en autostart) |
-| `ESC` | Sale del modo máscara |
+| `--timeout` | Seconds of pause before flushing the text (default: 1.5) |
+| `--corrector` | `languagetool` (default), `openai`, or `none` |
+| `--lang` | Language for the spellchecker (default: `en`) |
+| `--quiet` | Only log to file (useful for autostart setups) |
+| `ESC` | Exits masked mode |
 
-### Corrector OpenAI
+### OpenAI Spellchecker
 
 ```bash
 set OPENAI_API_KEY=sk-...
 python TypeBuffer.py --corrector openai
 ```
 
-Variables opcionales: `OPENAI_MODEL`, `OPENAI_BASE_URL`.
+Optional variables: `OPENAI_MODEL`, `OPENAI_BASE_URL`.
 
-### LanguageTool local
+### Local LanguageTool
 
 ```bash
 set LANGUAGETOOL_URL=http://127.0.0.1:8010/v2/check
 ```
 
-## Compilar (.exe)
+## Build (Stand-alone Executable)
 
 ```bash
 # Windows
@@ -71,36 +70,38 @@ build.bat
 bash build.sh
 ```
 
-El binario queda en `dist/TypeBuffer` (o `TypeBuffer.exe`).
+The binary will be placed in `dist/TypeBuffer` (or `TypeBuffer.exe`). Note: GitHub Actions are provided to automatically build cross-platform releases on new tags.
 
-## Arranque al iniciar sesión
+## Login Autostart (Run at Startup)
+
+You can easily configure TypeBuffer to start automatically when you log into your computer.
 
 ```bash
-python install_autostart.py --install
-python install_autostart.py --uninstall
+python setup_autostart.py --install
+python setup_autostart.py --uninstall
 ```
 
-Compatible con Windows (Startup), Linux (`~/.config/autostart`) y macOS (LaunchAgents).
+Compatible with Windows (Startup folder), Linux (`~/.config/autostart`), and macOS (`LaunchAgents`).
 
-## Estructura
+## Structure
 
 ```
-TypeBuffer.py         # aplicación principal
-corrector.py          # LanguageTool / OpenAI
-install_autostart.py  # autostart multiplataforma
-TypeBuffer.bat        # launcher Windows
-build.bat / build.sh  # PyInstaller
+TypeBuffer.py         # Main application
+corrector.py          # LanguageTool / OpenAI integration
+setup_autostart.py    # Cross-platform login autostart script
+TypeBuffer.bat        # Windows launcher
+build.bat / build.sh  # PyInstaller build scripts
 requirements.txt
 requirements-dev.txt
 ```
 
-## Privacidad
+## Privacy
 
-- El texto enmascarado solo vive en memoria hasta el volcado
-- Con `--corrector languagetool` (API pública) el texto se envía a LanguageTool.org
-- Con `--corrector openai` se envía a la API configurada
-- Con `--corrector none` no hay red
+- Masked text only lives in memory until it is flushed.
+- With `--corrector languagetool` (default public API), text is sent to LanguageTool.org.
+- With `--corrector openai`, text is sent to the configured OpenAI API.
+- With `--corrector none`, no network requests are made.
 
-## Licencia
+## License
 
-MIT — ver [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

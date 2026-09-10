@@ -1,10 +1,10 @@
 """
-TypeBuffer — modo máscara de teclado.
-Intercepta la escritura "normal" y, tras una pausa, la vuelca en la app activa.
-Atajos, flechas, Bloq Mayús, etc. pasan al instante (sin delay).
+TypeBuffer — masked typing mode.
+Intercepts "normal" typing and, after a pause, dumps it into the active app.
+Shortcuts, arrows, Caps Lock, etc. pass instantly (no delay).
 
-En Windows: hook WH_KEYBOARD_LL con bloqueo selectivo.
-En macOS/Linux: pynput (suppress global; más limitado).
+On Windows: WH_KEYBOARD_LL hook with selective blocking.
+On macOS/Linux: pynput (global suppress; more limited).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from corrector import correct_text
 
-DEFAULT_TIMEOUT = 2.0
+DEFAULT_TIMEOUT = 1.5
 LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share") / "TypeBuffer"
 LOG_FILE = LOG_DIR / "typebuffer.log"
 
@@ -131,13 +131,13 @@ def _down(vk: int) -> bool:
 
 
 def _sanitize_chars(text: str) -> str:
-    """Quita acentos huérfanos (´ ` ¨…) de teclas muertas; conserva letras acentuadas."""
+    """Removes orphaned accents (´ ` ¨…) from dead keys; keeps accented letters."""
     out: list[str] = []
     for ch in text:
         if ch in "\t\n\r ":
             out.append(ch)
             continue
-        # Sk = symbol, modifier (´ ` ¨ ^ ~ como caracteres sueltos)
+        # Sk = symbol, modifier (´ ` ¨ ^ ~ as standalone chars)
         if unicodedata.category(ch) == "Sk":
             continue
         if ord(ch) >= 32:
@@ -147,8 +147,8 @@ def _sanitize_chars(text: str) -> str:
 
 def _to_unicode(vk: int, scan: int, shift: bool, ctrl: bool, alt: bool) -> str | None:
     """
-    Resuelve el caracter con el layout actual.
-    n < 0 → tecla muerta (´ ` ¨…): no insertar nada; la siguiente tecla compondrá (á, é…).
+    Resolves character with current layout.
+    n < 0 -> dead key (´ ` ¨…): don't insert anything; the next key will compose (á, é…).
     """
     user32 = ctypes.windll.user32
     state = (ctypes.c_ubyte * 256)()
@@ -197,7 +197,7 @@ class TypeBufferApp:
         self._proc = None
         self._controller = None
         self._pynput_listener = None
-        # Teclas cuyo KEYDOWN bloqueamos → también bloqueamos su KEYUP
+        # Keys whose KEYDOWN we block -> we also block their KEYUP
         self._blocked_downs: set[int] = set()
 
     def _push(self, text: str) -> None:
@@ -225,16 +225,16 @@ class TypeBufferApp:
             return None
 
     def _modifier_passthrough(self) -> bool:
-        """True si Ctrl/Alt/Win indican un atajo del sistema (no escritura enmascarada)."""
+        """True if Ctrl/Alt/Win indicate a system shortcut (not masked typing)."""
         ctrl = _down(VK_CONTROL)
         alt = _down(VK_MENU)
         win = _down(VK_LWIN) or _down(VK_RWIN)
         if win:
             return True
-        # Ctrl puro → Ctrl+C/V/...  (AltGr = Ctrl+Alt → False)
+        # Pure Ctrl -> Ctrl+C/V/... (AltGr = Ctrl+Alt -> False)
         if ctrl and not alt:
             return True
-        # Alt puro → menús / Alt+F4
+        # Pure Alt -> menus / Alt+F4
         if alt and not ctrl:
             return True
         return False
@@ -297,7 +297,7 @@ class TypeBufferApp:
                         if vk == VK_ESCAPE:
                             return 1
         except Exception:
-            logging.exception("Error en hook de teclado")
+            logging.exception("Error in keyboard hook")
 
         return user32.CallNextHookEx(self._hook, nCode, wParam, lParam)
 
@@ -306,11 +306,11 @@ class TypeBufferApp:
         self._proc = _HOOKPROC(self._low_level_proc)
         self._hook = user32.SetWindowsHookExW(WH_KEYBOARD_LL, self._proc, None, 0)
         if not self._hook:
-            logging.error("No se pudo instalar el hook de teclado")
+            logging.error("Could not install keyboard hook")
             self.running = False
             return
 
-        logging.info("Hook Windows activo (bloqueo selectivo, sin delay en atajos)")
+        logging.info("Windows hook active (selective blocking, no delay on shortcuts)")
         msg = wintypes.MSG()
         while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
             user32.TranslateMessage(ctypes.byref(msg))
@@ -343,7 +343,7 @@ class TypeBufferApp:
             from pynput.keyboard import Controller
 
             self._controller = Controller()
-        # LLKHF_INJECTED → el hook no las vuelve a enmascarar
+        # LLKHF_INJECTED -> the hook won't mask them again
         self._controller.type(texto)
 
     def _start_pynput(self) -> None:
@@ -377,29 +377,29 @@ class TypeBufferApp:
         if not texto or not texto.strip():
             return
         if self.corrector not in ("none", "off", "no"):
-            logging.info("Corrigiendo (%s, %s)...", self.corrector, self.language)
+            logging.info("Checking (%s, %s)...", self.corrector, self.language)
             texto = correct_text(
                 texto,
                 provider=self.corrector,
                 language=self.language,
                 timeout=self.corrector_timeout,
             )
-        logging.info("Enviando: %r", texto)
+        logging.info("Sending: %r", texto)
         self._type_text(texto)
 
     def run(self) -> None:
-        logging.info("MODO MASCARA (timeout=%.1fs). ESC para salir.", self.timeout)
+        logging.info("MASKED MODE (timeout=%.1fs). ESC to exit.", self.timeout)
         logging.info(
-            "Pasan al instante: flechas, Bloq Mayus, Ctrl+C/V, Alt, Win, Supr, F-keys..."
+            "Instant pass-through: arrows, Caps Lock, Ctrl+C/V, Alt, Win, Del, F-keys..."
         )
-        logging.info("Corrector: %s (idioma=%s)", self.corrector, self.language)
+        logging.info("Spellchecker: %s (lang=%s)", self.corrector, self.language)
         logging.info("Log: %s", LOG_FILE)
 
         if sys.platform == "win32":
             self._start_windows()
         else:
             self._start_pynput()
-            logging.info("Plataforma no Windows: suppress global (limitado)")
+            logging.info("Non-Windows platform: global suppress (limited)")
 
         try:
             while self.running:
@@ -415,29 +415,29 @@ class TypeBufferApp:
                 self._stop_windows()
             elif self._pynput_listener is not None:
                 self._pynput_listener.stop()
-            logging.info("Sesion finalizada")
+            logging.info("Session ended")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="TypeBuffer — teclado enmascarado con volcado diferido")
+    p = argparse.ArgumentParser(description="TypeBuffer — masked keyboard with delayed output")
     p.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     p.add_argument("--quiet", action="store_true")
     p.add_argument(
         "--corrector",
         choices=("languagetool", "openai", "none"),
         default=os.environ.get("TYPEBUFFER_CORRECTOR", "languagetool"),
-        help="Corrector antes de soltar el texto (default: languagetool)",
+        help="Spellchecker to use before outputting text (default: languagetool)",
     )
     p.add_argument(
         "--lang",
-        default=os.environ.get("TYPEBUFFER_LANG", "es"),
-        help="Idioma del corrector (default: es)",
+        default=os.environ.get("TYPEBUFFER_LANG", "en"),
+        help="Language for the spellchecker (default: en)",
     )
     p.add_argument(
         "--corrector-timeout",
         type=float,
         default=8.0,
-        help="Timeout de red del corrector en segundos",
+        help="Spellchecker network timeout in seconds",
     )
     return p.parse_args(argv)
 
