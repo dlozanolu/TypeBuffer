@@ -1,0 +1,30 @@
+# Bytecode / caché
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.spec
+
+# Entornos
+.venv/
+venv/
+.env
+.env.*
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs y datos locales
+*.log
+TypeBuffer.log
+
+# PyInstaller one-off
+warn-*.txt
