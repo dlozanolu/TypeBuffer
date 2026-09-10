@@ -20,7 +20,8 @@ import unicodedata
 from ctypes import wintypes
 from pathlib import Path
 
-from corrector import correct_text
+from corrector import correct_text, translate_text, is_translation_prefix
+from config import config as app_config
 
 DEFAULT_TIMEOUT = 1.5
 LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share") / "TypeBuffer"
@@ -148,7 +149,7 @@ def _sanitize_chars(text: str) -> str:
 def _to_unicode(vk: int, scan: int, shift: bool, ctrl: bool, alt: bool) -> str | None:
     """
     Resolves character with current layout.
-    n < 0 -> dead key (´ ` ¨…): don't insert anything; the next key will compose (á, é…).
+    n < 0 -> dead key (´ ` ¨…): block it but don't add to buffer.
     """
     user32 = ctypes.windll.user32
     state = (ctypes.c_ubyte * 256)()
@@ -167,8 +168,8 @@ def _to_unicode(vk: int, scan: int, shift: bool, ctrl: bool, alt: bool) -> str |
     buf = ctypes.create_unicode_buffer(8)
     n = user32.ToUnicode(vk, scan, state, buf, len(buf), 0)
     if n < 0:
-        # Tecla muerta consumida; esperar vocal/consonante
-        return None
+        # Dead key: return empty string so it gets blocked but NOT pushed to buffer
+        return ""
     if n > 0:
         return _sanitize_chars(buf.value[:n]) or None
     return None
@@ -199,6 +200,24 @@ class TypeBufferApp:
         self._pynput_listener = None
         # Keys whose KEYDOWN we block -> we also block their KEYUP
         self._blocked_downs: set[int] = set()
+        # Active = masking enabled. Paused = everything passes through.
+        self.active = app_config.get("active", True)
+        self._on_stop_callback = None
+
+    def set_active(self, active: bool) -> None:
+        """Enable/disable masking (used by the tray icon)."""
+        self.active = active
+        app_config.set("active", active)
+        if not active:
+            with self.lock:
+                self.buffer.clear()
+        logging.info("TypeBuffer %s", "ACTIVE" if active else "PAUSED")
+
+    def set_on_stop(self, callback) -> None:
+        self._on_stop_callback = callback
+
+    def stop(self) -> None:
+        self.running = False
 
     def _push(self, text: str) -> None:
         text = _sanitize_chars(text)
@@ -218,10 +237,16 @@ class TypeBufferApp:
 
     def _take_flush(self) -> str | None:
         with self.lock:
-            if self.buffer and (time.time() - self.last_type_time > self.timeout):
-                texto = _sanitize_chars("".join(self.buffer))
-                self.buffer.clear()
-                return texto or None
+            if self.buffer:
+                current_text = "".join(self.buffer)
+                # In translation mode, eliminate long waits: trigger quickly (0.35s)
+                # because the remote AI translation call itself introduces network latency.
+                is_translating = app_config.get("translate", True) and is_translation_prefix(current_text)
+                effective_timeout = 0.35 if is_translating else self.timeout
+                if time.time() - self.last_type_time > effective_timeout:
+                    texto = _sanitize_chars(current_text)
+                    self.buffer.clear()
+                    return texto or None
             return None
 
     def _modifier_passthrough(self) -> bool:
@@ -240,6 +265,8 @@ class TypeBufferApp:
         return False
 
     def _should_block_down(self, vk: int, scan: int) -> bool:
+        if not self.active:
+            return False
         if vk == VK_ESCAPE:
             self.running = False
             return True
@@ -253,10 +280,21 @@ class TypeBufferApp:
         if vk == VK_BACK:
             return self._backspace()
 
+        # If Space is the very first character typed, pass it through instantly without delay.
         if vk == VK_SPACE:
+            with self.lock:
+                if not self.buffer:
+                    return False
             self._push(" ")
             return True
+
         if vk == VK_RETURN:
+            # If in translation mode, pressing Enter triggers immediate translation flush.
+            with self.lock:
+                current = "".join(self.buffer)
+                if app_config.get("translate", True) and is_translation_prefix(current):
+                    self.last_type_time = 0
+                    return True
             self._push("\n")
             return True
         if vk == VK_TAB:
@@ -270,9 +308,13 @@ class TypeBufferApp:
             ctrl=_down(VK_CONTROL),
             alt=_down(VK_MENU),
         )
-        if ch and all(ord(c) >= 32 for c in ch):
-            self._push(ch)
-            return True
+        if ch is not None:
+            if ch == "":
+                # It's a dead key. Block it from the active app, but don't buffer it.
+                return True
+            if all(ord(c) >= 32 for c in ch):
+                self._push(ch)
+                return True
 
         return False
 
@@ -374,9 +416,23 @@ class TypeBufferApp:
         self._pynput_listener.start()
 
     def _prepare_and_type(self, texto: str) -> None:
-        if not texto or not texto.strip():
+        if not texto:
             return
-        if self.corrector not in ("none", "off", "no"):
+        # Skip fragments that are only spaces (avoid dumping lone whitespace),
+        # but keep meaningful control characters like newline (Enter) or tab.
+        if texto.strip() == "" and "\n" not in texto and "\t" not in texto:
+            return
+
+        # 1) Translation mode: "en: some text" -> translate via AI.
+        if app_config.get("translate", True):
+            translated = translate_text(texto, timeout=self.corrector_timeout)
+            if translated is not None:
+                logging.info("Sending (translated): %r", translated)
+                self._type_text(translated)
+                return
+
+        # 2) Spellchecker.
+        if app_config.get("spellcheck", True) and self.corrector not in ("none", "off", "no"):
             logging.info("Checking (%s, %s)...", self.corrector, self.language)
             texto = correct_text(
                 texto,
@@ -384,6 +440,7 @@ class TypeBufferApp:
                 language=self.language,
                 timeout=self.corrector_timeout,
             )
+
         logging.info("Sending: %r", texto)
         self._type_text(texto)
 
@@ -393,6 +450,7 @@ class TypeBufferApp:
             "Instant pass-through: arrows, Caps Lock, Ctrl+C/V, Alt, Win, Del, F-keys..."
         )
         logging.info("Spellchecker: %s (lang=%s)", self.corrector, self.language)
+        logging.info("Translation mode: %s", app_config.get("translate", True))
         logging.info("Log: %s", LOG_FILE)
 
         if sys.platform == "win32":
@@ -416,22 +474,24 @@ class TypeBufferApp:
             elif self._pynput_listener is not None:
                 self._pynput_listener.stop()
             logging.info("Session ended")
+            if self._on_stop_callback:
+                self._on_stop_callback()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="TypeBuffer — masked keyboard with delayed output")
-    p.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    p.add_argument("--timeout", type=float, default=None)
     p.add_argument("--quiet", action="store_true")
     p.add_argument(
         "--corrector",
-        choices=("languagetool", "openai", "none"),
-        default=os.environ.get("TYPEBUFFER_CORRECTOR", "languagetool"),
-        help="Spellchecker to use before outputting text (default: languagetool)",
+        choices=("languagetool", "openai", "claude", "deepseek", "none"),
+        default=None,
+        help="Spellchecker/AI provider to use (default: from config, else languagetool)",
     )
     p.add_argument(
         "--lang",
-        default=os.environ.get("TYPEBUFFER_LANG", "en"),
-        help="Language for the spellchecker (default: en)",
+        default=None,
+        help="Language for the spellchecker (default: from config, else en)",
     )
     p.add_argument(
         "--corrector-timeout",
@@ -445,12 +505,56 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     setup_logging(quiet=args.quiet)
-    TypeBufferApp(
-        timeout=args.timeout,
-        corrector=args.corrector,
-        language=args.lang,
+
+    # Resolve settings: CLI override > config > default.
+    provider = args.corrector or app_config.get("ai_provider", "languagetool")
+    language = args.lang or app_config.get("lang", "en")
+    timeout = args.timeout if args.timeout is not None else app_config.get("timeout", 1.5)
+
+    # First-run welcome screen (skip in quiet/autostart mode).
+    if app_config.get("first_run", True) and not args.quiet:
+        try:
+            from gui import show_settings
+            show_settings(is_welcome=True)
+            app_config.load()
+        except Exception as exc:
+            logging.warning("Could not show the welcome screen: %s", exc)
+
+    app = TypeBufferApp(
+        timeout=timeout,
+        corrector=provider,
+        language=language,
         corrector_timeout=args.corrector_timeout,
-    ).run()
+    )
+
+    # System tray icon (double-click toggles active/inactive).
+    tray = None
+    try:
+        from tray import TrayIcon
+        tray = TrayIcon(
+            on_exit_callback=app.stop,
+            on_toggle_callback=app.set_active,
+        )
+        app.set_on_stop(lambda: tray.stop() if tray else None)
+    except Exception as exc:
+        logging.warning("Could not start the tray icon: %s", exc)
+
+    # Run the keyboard hook in a background thread.
+    app_thread = threading.Thread(target=app.run, daemon=True, name="typebuffer-app")
+    app_thread.start()
+
+    # Keep the main thread alive with the tray (or a simple loop as fallback).
+    if tray is not None:
+        tray.run()
+    else:
+        try:
+            while app.running:
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            pass
+
+    app.stop()
+    app_thread.join(timeout=2)
     return 0
 
 

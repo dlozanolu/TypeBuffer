@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TypeBuffer - Masked Typing</title>
+    <title>TypeBuffer - Masked Typing & Live AI Translation</title>
     <style>
         :root {
             --bg-color: #0d1117;
@@ -11,6 +11,8 @@
             --accent-color: #58a6ff;
             --border-color: #30363d;
             --card-bg: #161b22;
+            --highlight: #f0883e;
+            --badge-bg: #21262d;
         }
 
         body {
@@ -27,48 +29,72 @@
 
         header {
             text-align: center;
-            padding: 4rem 2rem;
-            max-width: 800px;
+            padding: 4rem 2rem 2rem;
+            max-width: 860px;
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: var(--badge-bg);
+            border: 1px solid var(--border-color);
+            color: var(--highlight);
+            padding: 0.35rem 0.9rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
         }
 
         h1 {
             font-size: 3.5rem;
             margin-bottom: 0.5rem;
             color: #ffffff;
+            letter-spacing: -0.03em;
         }
 
         .subtitle {
-            font-size: 1.25rem;
+            font-size: 1.3rem;
             color: #8b949e;
             margin-bottom: 2rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
         .btn {
             display: inline-block;
             background-color: #238636;
             color: #ffffff;
-            padding: 0.75rem 1.5rem;
+            padding: 0.75rem 1.6rem;
             border-radius: 6px;
             text-decoration: none;
             font-weight: 600;
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             border: 1px solid rgba(240, 246, 252, 0.1);
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, transform 0.1s;
         }
 
         .btn:hover {
             background-color: #2ea043;
+            transform: translateY(-1px);
         }
 
         .btn-outline {
             background-color: transparent;
             border-color: var(--border-color);
             color: var(--accent-color);
-            margin-left: 1rem;
         }
 
         .btn-outline:hover {
-            background-color: var(--border-color);
+            background-color: var(--card-bg);
+            border-color: var(--accent-color);
         }
 
         main {
@@ -78,10 +104,69 @@
             box-sizing: border-box;
         }
 
+        .demo-box {
+            background: linear-gradient(145deg, #161b22, #0d1117);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2.5rem 0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .demo-box h3 {
+            color: #ffffff;
+            margin-top: 0;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .demo-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 1.5rem;
+        }
+
+        @media (max-width: 650px) {
+            .demo-row {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+
+        .demo-step {
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.95rem;
+        }
+
+        .demo-label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8b949e;
+            margin-bottom: 0.4rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-weight: 700;
+        }
+
+        .demo-arrow {
+            color: var(--accent-color);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
             margin: 3rem 0;
         }
 
@@ -89,12 +174,29 @@
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 2rem;
+            padding: 1.5rem;
+            transition: border-color 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: #58a6ff;
         }
 
         .feature-card h3 {
             color: var(--accent-color);
             margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .feature-highlight {
+            border: 1px solid #d29922;
+            background: linear-gradient(180deg, rgba(210, 153, 34, 0.08) 0%, var(--card-bg) 100%);
+        }
+
+        .feature-highlight h3 {
+            color: var(--highlight);
         }
 
         .terminal {
@@ -104,7 +206,7 @@
             padding: 1.5rem;
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
             overflow-x: auto;
-            margin: 2rem 0;
+            margin: 1.5rem 0 2.5rem;
         }
 
         .terminal-code {
@@ -117,11 +219,12 @@
 
         footer {
             margin-top: 4rem;
-            padding: 2rem;
+            padding: 2.5rem 2rem;
             border-top: 1px solid var(--border-color);
             text-align: center;
             width: 100%;
             color: #8b949e;
+            box-sizing: border-box;
         }
         
         a {
@@ -137,36 +240,81 @@
 <body>
 
 <header>
+    <div class="badge">✨ New: Real-Time Live Translation Mode</div>
     <h1>TypeBuffer</h1>
-    <p class="subtitle">Masked typing mode for your desktop. Type freely, auto-correct grammar, and dump the text in one go.</p>
-    <a href="https://github.com/dlozanolu/TypeBuffer/releases" class="btn">Download Latest Release</a>
-    <a href="https://github.com/dlozanolu/TypeBuffer" class="btn btn-outline">View on GitHub</a>
+    <p class="subtitle">Write in one language, see it appear in another. Mask your keyboard, proofread with AI, and dump your sentences all at once.</p>
+    <div class="btn-group">
+        <a href="https://github.com/dlozanolu/TypeBuffer/releases" class="btn">Download Latest Release</a>
+        <a href="https://github.com/dlozanolu/TypeBuffer" class="btn btn-outline">View on GitHub</a>
+    </div>
 </header>
 
 <main>
-    <h2>How it works</h2>
+    <!-- Featured Translation Section -->
+    <div class="demo-box">
+        <h3>🌐 Live Multilingual Translation</h3>
+        <p>Type in your native tongue and let TypeBuffer instantly translate and inject the text in your target language without awkward context switching.</p>
+        
+        <div class="demo-row">
+            <div class="demo-step">
+                <span class="demo-label">You Type (in Spanish)</span>
+                <span style="color: #79c0ff;">en:</span> Buenos días, ¿podemos revisar la reunión?
+            </div>
+            <div class="demo-arrow">➔</div>
+            <div class="demo-step">
+                <span class="demo-label">App Receives (in English)</span>
+                <span style="color: #7ee787;">Good morning, can we review the meeting?</span>
+            </div>
+        </div>
+
+        <div class="demo-row" style="margin-top: 0.8rem;">
+            <div class="demo-step">
+                <span class="demo-label">You Type (in English)</span>
+                <span style="color: #79c0ff;">fr:</span> Thank you very much for your help today.
+            </div>
+            <div class="demo-arrow">➔</div>
+            <div class="demo-step">
+                <span class="demo-label">App Receives (in French)</span>
+                <span style="color: #7ee787;">Merci beaucoup pour votre aide aujourd'hui.</span>
+            </div>
+        </div>
+    </div>
+
+    <h2>How It Works</h2>
     <p>
-        TypeBuffer intercepts your keyboard input silently. Nothing appears on your screen as you type. 
-        Once you stop typing for <strong>1.5 seconds</strong>, TypeBuffer automatically flushes the text you typed into your active window.
-        Instant passthrough ensures that shortcuts (Ctrl+C, Ctrl+V), arrow keys, and system keys work flawlessly without any delay.
+        TypeBuffer intercepts your keyboard input silently. As you type, nothing shows up on your screen. 
+        Once you pause typing for <strong>1.5 seconds</strong> (or instantly in translation mode), TypeBuffer runs your configured AI checker/translator and outputs the complete, polished sentence into your active window.
     </p>
 
     <div class="features">
+        <div class="feature-card feature-highlight">
+            <h3>🌐 On-The-Fly Translation</h3>
+            <p>Write in any language using simple prefixes (<code>en:</code>, <code>es:</code>, <code>fr:</code>, <code>de:</code>, etc.). The AI translates with zero extra delay directly into your chat or editor.</p>
+        </div>
+
         <div class="feature-card">
             <h3>🔒 Ghost Typing</h3>
-            <p>Hide your typing process. Think, pause, and let your complete sentence appear at once.</p>
+            <p>Hide your typing mistakes, hesitations, and backspaces. Focus your thoughts and let your final sentence appear clean and complete.</p>
         </div>
+
         <div class="feature-card">
-            <h3>✨ Auto Spellchecker</h3>
-            <p>Integrated with LanguageTool and OpenAI. It checks the grammar of your complete sentence <em>before</em> sending it to the app.</p>
+            <h3>✨ Auto Proofreading</h3>
+            <p>Integrated with LanguageTool, OpenAI, Claude, and DeepSeek. Automatically detects the language and corrects grammar with full sentence context.</p>
         </div>
+
         <div class="feature-card">
-            <h3>🚀 Run at Startup</h3>
-            <p>Includes a cross-platform autostart script. Set it up once and forget about it. Perfect for daily workflows.</p>
+            <h3>⚡ Instant Passthrough</h3>
+            <p>Shortcuts (Ctrl+C, Ctrl+V), arrows, Delete, Enter, and initial spaces pass through immediately without any lag or buffering.</p>
         </div>
+
         <div class="feature-card">
-            <h3>💻 Cross-Platform</h3>
-            <p>Native low-level hooks on Windows for perfect shortcut passthrough, with pynput support for macOS and Linux.</p>
+            <h3>🎛️ System Tray & Settings</h3>
+            <p>Double-click the tray icon to pause or resume. Open the settings window anytime to tweak timeouts or add your favorite AI API keys.</p>
+        </div>
+
+        <div class="feature-card">
+            <h3>🚀 Run on Startup</h3>
+            <p>One-click autostart setup for Windows, macOS, and Linux. Runs unobtrusively in the background without needing administrator privileges.</p>
         </div>
     </div>
 
@@ -175,12 +323,13 @@
 <span class="terminal-prompt">$</span> <span class="terminal-code">pip install -r requirements.txt</span><br>
 <span class="terminal-prompt">$</span> <span class="terminal-code">python TypeBuffer.py</span><br>
 <br>
-<span class="terminal-code">2026-09-10 18:00:00 MASKED MODE (timeout=1.5s). ESC to exit.</span><br>
-<span class="terminal-code">2026-09-10 18:00:00 Instant pass-through: arrows, Caps Lock, Ctrl+C/V, Alt, Win, Del, F-keys...</span>
+<span class="terminal-code">2026-09-11 00:00:00 MASKED MODE (timeout=1.5s). ESC to exit.</span><br>
+<span class="terminal-code">2026-09-11 00:00:00 Instant pass-through: arrows, Caps Lock, Ctrl+C/V, Alt, Win, Del, F-keys...</span><br>
+<span class="terminal-code">2026-09-11 00:00:00 Translation mode: True (Prefix with 'en: ', 'fr: ', etc.)</span>
     </div>
 
-    <h2>Enable Auto-Start</h2>
-    <p>Set up TypeBuffer to run automatically when you log into your system:</p>
+    <h2>Configure Autostart</h2>
+    <p>Set up TypeBuffer to run automatically whenever you log into your system:</p>
     <div class="terminal">
 <span class="terminal-prompt">$</span> <span class="terminal-code">python setup_autostart.py --install</span>
     </div>
