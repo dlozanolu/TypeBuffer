@@ -3,23 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TypeBuffer - Masked Typing & Live AI Translation</title>
+    <title>TypeBuffer — Type at the speed of thought. Translate and polish at the speed of AI.</title>
+    <meta name="description" content="TypeBuffer lets you type into a silent, distraction-free buffer. Stop looking at the cursor, type with pure kinesthetic flow, and let AI instantly translate and proofread your sentences upon release.">
     <style>
         :root {
             --bg-color: #0d1117;
             --text-color: #c9d1d9;
+            --text-muted: #8b949e;
             --accent-color: #58a6ff;
+            --accent-glow: rgba(88, 166, 255, 0.15);
             --border-color: #30363d;
             --card-bg: #161b22;
+            --card-hover-border: #484f58;
             --highlight: #f0883e;
             --badge-bg: #21262d;
+            --success: #3fb950;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            line-height: 1.6;
+            line-height: 1.65;
             margin: 0;
             padding: 0;
             display: flex;
@@ -29,36 +34,46 @@
 
         header {
             text-align: center;
-            padding: 4rem 2rem 2rem;
+            padding: 4.5rem 2rem 2.5rem;
             max-width: 860px;
         }
 
         .badge {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
             background-color: var(--badge-bg);
             border: 1px solid var(--border-color);
             color: var(--highlight);
-            padding: 0.35rem 0.9rem;
+            padding: 0.4rem 1rem;
             border-radius: 20px;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             font-weight: 600;
             margin-bottom: 1.5rem;
         }
 
         h1 {
-            font-size: 3.5rem;
-            margin-bottom: 0.5rem;
+            font-size: 3.8rem;
+            margin: 0 0 1rem;
             color: #ffffff;
-            letter-spacing: -0.03em;
+            letter-spacing: -0.04em;
+            font-weight: 800;
         }
 
-        .subtitle {
-            font-size: 1.3rem;
-            color: #8b949e;
-            margin-bottom: 2rem;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
+        .tagline {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f0f6fc;
+            margin: 0 0 1.25rem;
+            line-height: 1.35;
+        }
+
+        .hero-desc {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            margin: 0 auto 2.25rem;
+            max-width: 720px;
+            line-height: 1.6;
         }
 
         .btn-group {
@@ -72,7 +87,7 @@
             display: inline-block;
             background-color: #238636;
             color: #ffffff;
-            padding: 0.75rem 1.6rem;
+            padding: 0.8rem 1.8rem;
             border-radius: 6px;
             text-decoration: none;
             font-weight: 600;
@@ -98,28 +113,182 @@
         }
 
         main {
-            max-width: 900px;
+            max-width: 960px;
             padding: 2rem;
             width: 100%;
             box-sizing: border-box;
         }
 
+        /* Philosophy Section */
+        .philosophy-section {
+            background: linear-gradient(180deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.95) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 2.75rem 2.5rem;
+            margin: 2.5rem 0 3.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .philosophy-section h2 {
+            font-size: 1.85rem;
+            color: #ffffff;
+            margin-top: 0;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            letter-spacing: -0.02em;
+        }
+
+        .philosophy-lead {
+            font-size: 1.12rem;
+            color: #c9d1d9;
+            line-height: 1.7;
+            margin-bottom: 2rem;
+        }
+
+        .philosophy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .philosophy-card {
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.5rem;
+            transition: border-color 0.2s, transform 0.15s;
+        }
+
+        .philosophy-card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .philosophy-card h3 {
+            font-size: 1.15rem;
+            margin: 0 0 0.5rem;
+            color: #f0f6fc;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .philosophy-card p {
+            margin: 0;
+            font-size: 0.96rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        /* Section Headings */
+        .section-header {
+            text-align: center;
+            margin: 4rem 0 2rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.1rem;
+            color: #ffffff;
+            margin: 0 0 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .section-header p {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin: 0 auto;
+            max-width: 650px;
+        }
+
+        /* Pillars (Triptych) */
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.75rem;
+            margin: 2rem 0 3.5rem;
+        }
+
+        .pillar-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2.25rem 1.75rem;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+        }
+
+        .pillar-card:hover {
+            border-color: var(--card-hover-border);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            transform: translateY(-3px);
+        }
+
+        .pillar-card.highlight {
+            border-color: #d29922;
+            background: linear-gradient(180deg, rgba(210, 153, 34, 0.08) 0%, var(--card-bg) 100%);
+        }
+
+        .pillar-icon {
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .pillar-card h3 {
+            font-size: 1.35rem;
+            color: #ffffff;
+            margin: 0 0 0.35rem;
+            letter-spacing: -0.01em;
+        }
+
+        .pillar-subtitle {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 1rem;
+        }
+
+        .pillar-card.highlight .pillar-subtitle {
+            color: var(--highlight);
+        }
+
+        .pillar-card p {
+            color: var(--text-muted);
+            font-size: 0.98rem;
+            line-height: 1.6;
+            margin: 0;
+            flex-grow: 1;
+        }
+
+        /* Interactive Demo Box */
         .demo-box {
             background: linear-gradient(145deg, #161b22, #0d1117);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 2rem;
-            margin: 2.5rem 0;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            padding: 2.25rem;
+            margin: 2rem 0 3.5rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
         }
 
         .demo-box h3 {
             color: #ffffff;
-            margin-top: 0;
-            font-size: 1.3rem;
+            margin: 0 0 0.5rem;
+            font-size: 1.35rem;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
+        }
+
+        .demo-box > p {
+            color: var(--text-muted);
+            margin: 0 0 1.5rem;
+            font-size: 1rem;
         }
 
         .demo-row {
@@ -127,7 +296,7 @@
             grid-template-columns: 1fr auto 1fr;
             gap: 1rem;
             align-items: center;
-            margin-top: 1.5rem;
+            margin-top: 1rem;
         }
 
         @media (max-width: 650px) {
@@ -135,98 +304,189 @@
                 grid-template-columns: 1fr;
                 text-align: center;
             }
+            .demo-arrow {
+                transform: rotate(90deg);
+                margin: 0.25rem 0;
+            }
         }
 
         .demo-step {
             background-color: #010409;
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 1rem 1.2rem;
+            padding: 1.1rem 1.25rem;
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-            font-size: 0.95rem;
+            font-size: 0.96rem;
         }
 
         .demo-label {
             display: block;
-            font-size: 0.75rem;
+            font-size: 0.76rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #8b949e;
-            margin-bottom: 0.4rem;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 0.45rem;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-weight: 700;
         }
 
         .demo-arrow {
             color: var(--accent-color);
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             font-weight: bold;
         }
 
-        .features {
+        /* Secondary Features Grid */
+        .features-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 1.5rem;
-            margin: 3rem 0;
+            margin: 2rem 0 3.5rem;
         }
 
-        .feature-card {
+        .feature-item {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 1.5rem;
             transition: border-color 0.2s;
         }
 
-        .feature-card:hover {
-            border-color: #58a6ff;
+        .feature-item:hover {
+            border-color: var(--accent-color);
         }
 
-        .feature-card h3 {
-            color: var(--accent-color);
-            margin-top: 0;
+        .feature-item h4 {
+            color: #ffffff;
+            font-size: 1.1rem;
+            margin: 0 0 0.5rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .feature-highlight {
-            border: 1px solid #d29922;
-            background: linear-gradient(180deg, rgba(210, 153, 34, 0.08) 0%, var(--card-bg) 100%);
+        .feature-item p {
+            color: var(--text-muted);
+            font-size: 0.93rem;
+            margin: 0;
+            line-height: 1.55;
         }
 
-        .feature-highlight h3 {
-            color: var(--highlight);
-        }
-
+        /* Terminal Display */
         .terminal {
             background-color: #010409;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 1.5rem;
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
             overflow-x: auto;
-            margin: 1.5rem 0 2.5rem;
+            margin: 1.25rem 0 2.5rem;
+            font-size: 0.94rem;
         }
 
         .terminal-code {
             color: #e6edf3;
         }
-        
+
         .terminal-prompt {
             color: #7ee787;
         }
 
+        /* About the Author Section */
+        .author-box {
+            background: linear-gradient(145deg, #161b22, #0d1117);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 2.5rem;
+            margin: 4rem 0 2rem;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        @media (max-width: 700px) {
+            .author-box {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .author-avatar-col {
+                display: flex;
+                justify-content: center;
+            }
+        }
+
+        .author-badge {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1f6feb 0%, #238636 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #ffffff;
+            border: 2px solid var(--border-color);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .author-content h3 {
+            font-size: 1.45rem;
+            color: #ffffff;
+            margin: 0 0 0.35rem;
+            letter-spacing: -0.01em;
+        }
+
+        .author-role {
+            font-size: 0.95rem;
+            color: var(--accent-color);
+            font-weight: 600;
+            margin-bottom: 0.9rem;
+        }
+
+        .author-bio {
+            color: #c9d1d9;
+            font-size: 0.98rem;
+            line-height: 1.65;
+            margin: 0 0 1rem;
+        }
+
+        .author-company {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem 1.1rem;
+            font-size: 0.92rem;
+            color: #c9d1d9;
+            text-decoration: none;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        .author-company:hover {
+            border-color: var(--accent-color);
+            background-color: #0d1117;
+            text-decoration: none;
+        }
+
+        .author-company strong {
+            color: #ffffff;
+        }
+
         footer {
-            margin-top: 4rem;
+            margin-top: 3.5rem;
             padding: 2.5rem 2rem;
             border-top: 1px solid var(--border-color);
             text-align: center;
             width: 100%;
-            color: #8b949e;
+            color: var(--text-muted);
             box-sizing: border-box;
+            font-size: 0.95rem;
         }
-        
+
         a {
             color: var(--accent-color);
             text-decoration: none;
@@ -240,9 +500,12 @@
 <body>
 
 <header>
-    <div class="badge">✨ New: Real-Time Live Translation Mode</div>
+    <div class="badge">✨ Real-Time AI Translation & Masked Input</div>
     <h1>TypeBuffer</h1>
-    <p class="subtitle">Write in one language, see it appear in another. Mask your keyboard, proofread with AI, and dump your sentences all at once.</p>
+    <p class="tagline">Type at the speed of thought. Translate and polish at the speed of AI.</p>
+    <p class="hero-desc">
+        Write blindly into a silent buffer without visual distractions. Pause for 1.5 seconds, and watch your thoughts land cleanly on screen—translated, proofread, and distraction-free.
+    </p>
     <div class="btn-group">
         <a href="https://github.com/dlozanolu/TypeBuffer/releases" class="btn">Download Latest Release</a>
         <a href="https://github.com/dlozanolu/TypeBuffer" class="btn btn-outline">View on GitHub</a>
@@ -250,11 +513,73 @@
 </header>
 
 <main>
-    <!-- Featured Translation Section -->
+    <!-- Why TypeBuffer? (The Philosophy + The Magic) -->
+    <section class="philosophy-section">
+        <h2>🧠 Built for Pure Flow & Multilingual Speed</h2>
+        <p class="philosophy-lead">
+            When you write looking at the screen, your brain enters a constant visual feedback loop: you think, you type, and you re-read every single character as it appears. For expert typists, this loop slows you down and breaks your train of thought.
+        </p>
+        <p style="color: var(--text-muted); margin-bottom: 1.25rem;">TypeBuffer changes the paradigm:</p>
+
+        <div class="philosophy-grid">
+            <div class="philosophy-card">
+                <h3>⚡ Zero Visual Friction</h3>
+                <p>Your keyboard inputs are stored silently in a high-speed buffer. No flickering cursors, no micro-corrections, no distractions.</p>
+            </div>
+            <div class="philosophy-card">
+                <h3>🧘 Pure Kinesthetic Flow</h3>
+                <p>Type with your eyes on a neutral point—or even closed. Transition directly from mental idea to muscle memory.</p>
+            </div>
+            <div class="philosophy-card">
+                <h3>🪄 The Smart Buffer Dump</h3>
+                <p>The moment you pause, TypeBuffer releases your sentence. If you typed in your language, it lands clean. If you used a prefix (like <code>en:</code> or <code>fr:</code>), AI transforms and injects it instantly in your target language.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- The 3 Pillars (Triptych) -->
+    <div class="section-header">
+        <h2>The Core Pillars</h2>
+        <p>Combining the physical focus of blind typing with the intelligence of modern LLMs.</p>
+    </div>
+
+    <div class="pillars-grid">
+        <!-- Pillar 1 -->
+        <div class="pillar-card">
+            <div class="pillar-icon">🙈</div>
+            <h3>Blind & Uninterrupted Typing</h3>
+            <div class="pillar-subtitle">Write Without Looking</div>
+            <p>
+                Eliminate visual fatigue and the temptation to edit mid-sentence. Type continuously into the buffer and let your full thoughts drop onto the screen in a single, satisfying batch.
+            </p>
+        </div>
+
+        <!-- Pillar 2 -->
+        <div class="pillar-card highlight">
+            <div class="pillar-icon">🌐</div>
+            <h3>On-The-Fly Translation</h3>
+            <div class="pillar-subtitle">Think in Your Tongue, Output Anywhere</div>
+            <p>
+                Simply prefix your typing (<code>en:</code>, <code>fr:</code>, <code>es:</code>). TypeBuffer translates your buffered text seamlessly before releasing it directly into Slack, Word, email, or your code editor.
+            </p>
+        </div>
+
+        <!-- Pillar 3 -->
+        <div class="pillar-card">
+            <div class="pillar-icon">✨</div>
+            <h3>AI-Powered Proofreading</h3>
+            <div class="pillar-subtitle">Flawless Final Output</div>
+            <p>
+                Integrated with OpenAI, Claude, DeepSeek, and LanguageTool. TypeBuffer automatically cleans up grammar and typos in the buffer so your final text is always publication-ready.
+            </p>
+        </div>
+    </div>
+
+    <!-- Live Multilingual Translation Demo -->
     <div class="demo-box">
-        <h3>🌐 Live Multilingual Translation</h3>
-        <p>Type in your native tongue and let TypeBuffer instantly translate and inject the text in your target language without awkward context switching.</p>
-        
+        <h3>🌐 Live Translation in Action</h3>
+        <p>Type smoothly in your native tongue; TypeBuffer translates with near-zero latency and injects it straight into your active application.</p>
+
         <div class="demo-row">
             <div class="demo-step">
                 <span class="demo-label">You Type (in Spanish)</span>
@@ -267,7 +592,7 @@
             </div>
         </div>
 
-        <div class="demo-row" style="margin-top: 0.8rem;">
+        <div class="demo-row" style="margin-top: 0.85rem;">
             <div class="demo-step">
                 <span class="demo-label">You Type (in English)</span>
                 <span style="color: #79c0ff;">fr:</span> Thank you very much for your help today.
@@ -280,45 +605,37 @@
         </div>
     </div>
 
-    <h2>How It Works</h2>
-    <p>
-        TypeBuffer intercepts your keyboard input silently. As you type, nothing shows up on your screen. 
-        Once you pause typing for <strong>1.5 seconds</strong> (or instantly in translation mode), TypeBuffer runs your configured AI checker/translator and outputs the complete, polished sentence into your active window.
-    </p>
+    <!-- Additional Features -->
+    <div class="section-header">
+        <h2>Engineered for Daily Frictionless Work</h2>
+        <p>Reliable OS-level keyboard handling built for developers, writers, and multilingual professionals.</p>
+    </div>
 
-    <div class="features">
-        <div class="feature-card feature-highlight">
-            <h3>🌐 On-The-Fly Translation</h3>
-            <p>Write in any language using simple prefixes (<code>en:</code>, <code>es:</code>, <code>fr:</code>, <code>de:</code>, etc.). The AI translates with zero extra delay directly into your chat or editor.</p>
+    <div class="features-grid">
+        <div class="feature-item">
+            <h4>⚡ Instant Shortcut Passthrough</h4>
+            <p>Ctrl+C, Ctrl+V, arrow navigation, Enter, Backspace, and initial spaces pass through immediately without delay or buffering.</p>
         </div>
-
-        <div class="feature-card">
-            <h3>🔒 Ghost Typing</h3>
-            <p>Hide your typing mistakes, hesitations, and backspaces. Focus your thoughts and let your final sentence appear clean and complete.</p>
+        <div class="feature-item">
+            <h4>🎛️ System Tray & Settings</h4>
+            <p>Double-click the tray icon to pause or resume on the fly. Easily configure your preferred LLM provider, custom endpoints, and API keys.</p>
         </div>
-
-        <div class="feature-card">
-            <h3>✨ Auto Proofreading</h3>
-            <p>Integrated with LanguageTool, OpenAI, Claude, and DeepSeek. Automatically detects the language and corrects grammar with full sentence context.</p>
+        <div class="feature-item">
+            <h4>🚀 Zero-Config Autostart</h4>
+            <p>Configure TypeBuffer to run automatically on system login across Windows, macOS, and Linux without requiring admin rights.</p>
         </div>
-
-        <div class="feature-card">
-            <h3>⚡ Instant Passthrough</h3>
-            <p>Shortcuts (Ctrl+C, Ctrl+V), arrows, Delete, Enter, and initial spaces pass through immediately without any lag or buffering.</p>
-        </div>
-
-        <div class="feature-card">
-            <h3>🎛️ System Tray & Settings</h3>
-            <p>Double-click the tray icon to pause or resume. Open the settings window anytime to tweak timeouts or add your favorite AI API keys.</p>
-        </div>
-
-        <div class="feature-card">
-            <h3>🚀 Run on Startup</h3>
-            <p>One-click autostart setup for Windows, macOS, and Linux. Runs unobtrusively in the background without needing administrator privileges.</p>
+        <div class="feature-item">
+            <h4>🔒 Privacy-First Design</h4>
+            <p>Your typing buffer is stored only in ephemeral memory. With translation and spellcheck disabled, no network packets ever leave your machine.</p>
         </div>
     </div>
 
-    <h2>Getting Started</h2>
+    <!-- Getting Started -->
+    <div class="section-header">
+        <h2>Getting Started</h2>
+        <p>Run locally in seconds with Python or download a pre-built binary.</p>
+    </div>
+
     <div class="terminal">
 <span class="terminal-prompt">$</span> <span class="terminal-code">pip install -r requirements.txt</span><br>
 <span class="terminal-prompt">$</span> <span class="terminal-code">python TypeBuffer.py</span><br>
@@ -328,15 +645,35 @@
 <span class="terminal-code">2026-09-11 00:00:00 Translation mode: True (Prefix with 'en: ', 'fr: ', etc.)</span>
     </div>
 
-    <h2>Configure Autostart</h2>
-    <p>Set up TypeBuffer to run automatically whenever you log into your system:</p>
     <div class="terminal">
+<span class="terminal-prompt"># Enable login autostart (Windows, macOS, Linux)</span><br>
 <span class="terminal-prompt">$</span> <span class="terminal-code">python setup_autostart.py --install</span>
     </div>
+
+    <!-- About the Author & Wealthreader -->
+    <section class="author-box">
+        <div class="author-avatar-col">
+            <div class="author-badge">DL</div>
+        </div>
+        <div class="author-content">
+            <h3>David Lozano Lucas</h3>
+            <div class="author-role">Creator of TypeBuffer · Founder & CEO at Wealthreader</div>
+            <p class="author-bio">
+                David is a technology entrepreneur and API architect with over 25 years of leadership in fintech and enterprise software. He previously founded Afterbanks (an open-banking pioneer acquired by Indra) and now dedicates his full-time focus to building the next generation of financial infrastructure as Founder & CEO of <a href="https://wealthreader.com/" target="_blank" rel="noopener noreferrer"><strong>Wealthreader</strong></a>.
+            </p>
+            <a href="https://wealthreader.com/" target="_blank" rel="noopener noreferrer" class="author-company">
+                <span>🏦</span>
+                <span>Discover <strong>Wealthreader</strong>: The Banking & Wealth Aggregation API trusted by leading financial institutions</span>
+                <span style="color: var(--accent-color);">➔</span>
+            </a>
+        </div>
+    </section>
 </main>
 
 <footer>
-    <p>Open Source under the <a href="https://github.com/dlozanolu/TypeBuffer/blob/main/LICENSE">MIT License</a>. Created by David Lozano Lucas.</p>
+    <p>
+        Open Source under the <a href="https://github.com/dlozanolu/TypeBuffer/blob/main/LICENSE">MIT License</a> · Created by <a href="https://wealthreader.com/" target="_blank" rel="noopener noreferrer">David Lozano Lucas</a>.
+    </p>
 </footer>
 
 </body>
