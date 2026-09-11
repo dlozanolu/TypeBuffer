@@ -11,9 +11,10 @@ ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
 
 class TrayIcon:
-    def __init__(self, on_exit_callback=None, on_toggle_callback=None):
+    def __init__(self, on_exit_callback=None, on_toggle_callback=None, on_settings_saved_callback=None):
         self.on_exit_callback = on_exit_callback
         self.on_toggle_callback = on_toggle_callback
+        self.on_settings_saved_callback = on_settings_saved_callback
 
         try:
             self.icon_active = Image.open(ASSETS_DIR / "icon_active.png")
@@ -58,7 +59,11 @@ class TrayIcon:
 
     def open_settings(self, icon=None, item=None):
         # Run tkinter in a separate thread so it does not block the pystray loop.
-        threading.Thread(target=show_settings, args=(False,), daemon=True).start()
+        threading.Thread(
+            target=show_settings,
+            args=(False, self.on_settings_saved_callback),
+            daemon=True,
+        ).start()
 
     def exit_app(self, icon=None, item=None):
         self.icon.stop()

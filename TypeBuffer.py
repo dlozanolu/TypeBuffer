@@ -20,7 +20,7 @@ import unicodedata
 from ctypes import wintypes
 from pathlib import Path
 
-from corrector import correct_text, translate_text, is_translation_prefix
+from corrector import correct_text, translate_text, is_translation_prefix, detect_translation
 from config import config as app_config
 
 DEFAULT_TIMEOUT = 0.3
@@ -80,38 +80,38 @@ _PASSTHROUGH_VK = frozenset(
 )
 
 
-class KBDLLHOOKSTRUCT(ctypes.Structure):
-    _fields_ = [
-        ("vkCode", wintypes.DWORD),
-        ("scanCode", wintypes.DWORD),
-        ("flags", wintypes.DWORD),
-        ("time", wintypes.DWORD),
-        ("dwExtraInfo", ctypes.c_size_t),
-    ]
+if sys.platform == "win32":
+    class KBDLLHOOKSTRUCT(ctypes.Structure):
+        _fields_ = [
+            ("vkCode", wintypes.DWORD),
+            ("scanCode", wintypes.DWORD),
+            ("flags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", ctypes.c_size_t),
+        ]
 
+    # In Win64, LPARAM/LRESULT are pointer-sized; c_long is 32-bit and causes OverflowError
+    _LRESULT = ctypes.c_ssize_t
+    _HHOOK = ctypes.c_void_p
+    _HOOKPROC = ctypes.WINFUNCTYPE(_LRESULT, ctypes.c_int, wintypes.WPARAM, ctypes.c_void_p)
 
-# En Win64, LPARAM/LRESULT son pointer-sized; c_long es 32-bit y provoca OverflowError
-_LRESULT = ctypes.c_ssize_t
-_HHOOK = ctypes.c_void_p
-_HOOKPROC = ctypes.WINFUNCTYPE(_LRESULT, ctypes.c_int, wintypes.WPARAM, ctypes.c_void_p)
+    def _setup_user32_hook_apis() -> None:
+        user32 = ctypes.windll.user32
+        user32.SetWindowsHookExW.argtypes = [
+            ctypes.c_int,
+            _HOOKPROC,
+            wintypes.HINSTANCE,
+            wintypes.DWORD,
+        ]
+        user32.SetWindowsHookExW.restype = _HHOOK
+        user32.CallNextHookEx.argtypes = [_HHOOK, ctypes.c_int, wintypes.WPARAM, ctypes.c_void_p]
+        user32.CallNextHookEx.restype = _LRESULT
+        user32.UnhookWindowsHookEx.argtypes = [_HHOOK]
+        user32.UnhookWindowsHookEx.restype = wintypes.BOOL
 
-
-def _setup_user32_hook_apis() -> None:
-    user32 = ctypes.windll.user32
-    user32.SetWindowsHookExW.argtypes = [
-        ctypes.c_int,
-        _HOOKPROC,
-        wintypes.HINSTANCE,
-        wintypes.DWORD,
-    ]
-    user32.SetWindowsHookExW.restype = _HHOOK
-    user32.CallNextHookEx.argtypes = [_HHOOK, ctypes.c_int, wintypes.WPARAM, ctypes.c_void_p]
-    user32.CallNextHookEx.restype = _LRESULT
-    user32.UnhookWindowsHookEx.argtypes = [_HHOOK]
-    user32.UnhookWindowsHookEx.restype = wintypes.BOOL
-
-
-_setup_user32_hook_apis()
+    _setup_user32_hook_apis()
+else:
+    _HOOKPROC = None
 
 
 def setup_logging(quiet: bool) -> None:
@@ -128,7 +128,9 @@ def setup_logging(quiet: bool) -> None:
 
 
 def _down(vk: int) -> bool:
-    return bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
+    if sys.platform == "win32":
+        return bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
+    return False
 
 
 def _sanitize_chars(text: str) -> str:
@@ -151,6 +153,8 @@ def _to_unicode(vk: int, scan: int, shift: bool, ctrl: bool, alt: bool) -> str |
     Resolves character with current layout.
     n < 0 -> dead key (´ ` ¨…): block it but don't add to buffer.
     """
+    if sys.platform != "win32":
+        return None
     user32 = ctypes.windll.user32
     state = (ctypes.c_ubyte * 256)()
     if shift:
@@ -178,15 +182,18 @@ def _to_unicode(vk: int, scan: int, shift: bool, ctrl: bool, alt: bool) -> str |
 class TypeBufferApp:
     def __init__(
         self,
-        timeout: float,
+        timeout: float | None = None,
         *,
-        corrector: str = "languagetool",
-        language: str = "es",
+        corrector: str | None = None,
+        language: str | None = None,
         corrector_timeout: float = 8.0,
+        cli_timeout: float | None = None,
+        cli_corrector: str | None = None,
+        cli_lang: str | None = None,
     ) -> None:
-        self.timeout = timeout
-        self.corrector = corrector
-        self.language = language
+        self._cli_timeout = cli_timeout
+        self._cli_corrector = cli_corrector
+        self._cli_lang = cli_lang
         self.corrector_timeout = corrector_timeout
         self.buffer: list[str] = []
         self.last_type_time = time.time()
@@ -200,14 +207,53 @@ class TypeBufferApp:
         self._pynput_listener = None
         # Keys whose KEYDOWN we block -> we also block their KEYUP
         self._blocked_downs: set[int] = set()
-        # Active = masking enabled. Paused = everything passes through.
-        self.active = app_config.get("active", True)
         self._on_stop_callback = None
+        self._last_config_check = time.time()
+
+    @property
+    def timeout(self) -> float:
+        if self._cli_timeout is not None:
+            return min(3.0, max(0.1, float(self._cli_timeout)))
+        val = app_config.get("timeout", DEFAULT_TIMEOUT)
+        try:
+            return min(3.0, max(0.1, float(val)))
+        except (ValueError, TypeError):
+            return DEFAULT_TIMEOUT
+
+    @property
+    def corrector(self) -> str:
+        if self._cli_corrector is not None:
+            return self._cli_corrector
+        return app_config.get("ai_provider", "languagetool")
+
+    @property
+    def language(self) -> str:
+        if self._cli_lang is not None:
+            return self._cli_lang
+        return app_config.get("lang", "en")
+
+    @property
+    def active(self) -> bool:
+        return app_config.get("active", True)
+
+    @active.setter
+    def active(self, value: bool) -> None:
+        app_config.set("active", value)
+
+    def reload_config(self) -> None:
+        """Reloads settings from disk and applies them immediately."""
+        app_config.load()
+        logging.info(
+            "Config reloaded: timeout=%.2fs, provider=%s, lang=%s, active=%s",
+            self.timeout,
+            self.corrector,
+            self.language,
+            self.active,
+        )
 
     def set_active(self, active: bool) -> None:
         """Enable/disable masking (used by the tray icon)."""
         self.active = active
-        app_config.set("active", active)
         if not active:
             with self.lock:
                 self.buffer.clear()
@@ -237,16 +283,29 @@ class TypeBufferApp:
 
     def _take_flush(self) -> str | None:
         with self.lock:
-            if self.buffer:
-                current_text = "".join(self.buffer)
-                # In translation mode, eliminate long waits: trigger quickly (min 0.15s)
-                # because the remote AI translation call itself introduces network latency.
-                is_translating = app_config.get("translate", True) and is_translation_prefix(current_text)
-                effective_timeout = min(0.15, self.timeout) if is_translating else self.timeout
-                if time.time() - self.last_type_time > effective_timeout:
-                    texto = _sanitize_chars(current_text)
-                    self.buffer.clear()
-                    return texto or None
+            if not self.buffer:
+                return None
+
+            current_text = "".join(self.buffer)
+            now = time.time()
+            elapsed = now - self.last_type_time
+
+            # Translation mode handling:
+            # If the user is typing a translation prefix (e.g. 'en:' or '{es]:'),
+            # DO NOT flush prematurely while only the prefix is typed!
+            # Keep buffering until the user types the message to translate.
+            if app_config.get("translate", True) and is_translation_prefix(current_text):
+                has_content = detect_translation(current_text) is not None
+                if not has_content:
+                    # Incomplete prefix; do not flush unless idle for 5 seconds fallback.
+                    if elapsed < 5.0:
+                        return None
+
+            if elapsed > self.timeout:
+                texto = _sanitize_chars(current_text)
+                self.buffer.clear()
+                return texto or None
+
             return None
 
     def _modifier_passthrough(self) -> bool:
@@ -289,12 +348,13 @@ class TypeBufferApp:
             return True
 
         if vk == VK_RETURN:
-            # If in translation mode, pressing Enter triggers immediate translation flush.
+            # If in translation mode and there is text to translate, pressing Enter triggers immediate translation flush.
             with self.lock:
                 current = "".join(self.buffer)
                 if app_config.get("translate", True) and is_translation_prefix(current):
-                    self.last_type_time = 0
-                    return True
+                    if detect_translation(current):
+                        self.last_type_time = 0
+                        return True
             self._push("\n")
             return True
         if vk == VK_TAB:
@@ -406,6 +466,12 @@ class TypeBufferApp:
             if key == keyboard.Key.space:
                 self._push(" ")
             elif key == keyboard.Key.enter:
+                with self.lock:
+                    current = "".join(self.buffer)
+                    if app_config.get("translate", True) and is_translation_prefix(current):
+                        if detect_translation(current):
+                            self.last_type_time = 0
+                            return
                 self._push("\n")
             elif key == keyboard.Key.tab:
                 self._push("\t")
@@ -462,6 +528,12 @@ class TypeBufferApp:
         try:
             while self.running:
                 time.sleep(0.05)
+                now = time.time()
+                if now - self._last_config_check > 1.0:
+                    self._last_config_check = now
+                    if app_config.check_reload():
+                        logging.info("Config file changed on disk, reloaded.")
+
                 texto = self._take_flush()
                 if texto is not None:
                     self._prepare_and_type(texto)
@@ -525,6 +597,8 @@ def main(argv: list[str] | None = None) -> int:
     provider = args.corrector or app_config.get("ai_provider", "languagetool")
     language = args.lang or app_config.get("lang", "en")
     timeout = args.timeout if args.timeout is not None else app_config.get("timeout", DEFAULT_TIMEOUT)
+    if timeout > 3.0:
+        timeout = 3.0
 
     # First-run welcome screen (skip in quiet/autostart mode).
     if app_config.get("first_run", True) and not args.quiet:
@@ -540,6 +614,9 @@ def main(argv: list[str] | None = None) -> int:
         corrector=provider,
         language=language,
         corrector_timeout=args.corrector_timeout,
+        cli_timeout=args.timeout,
+        cli_corrector=args.corrector,
+        cli_lang=args.lang,
     )
 
     # System tray icon (double-click toggles active/inactive).
@@ -549,6 +626,7 @@ def main(argv: list[str] | None = None) -> int:
         tray = TrayIcon(
             on_exit_callback=app.stop,
             on_toggle_callback=app.set_active,
+            on_settings_saved_callback=app.reload_config,
         )
         app.set_on_stop(lambda: tray.stop() if tray else None)
     except Exception as exc:

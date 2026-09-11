@@ -28,11 +28,12 @@ log = logging.getLogger(__name__)
 
 LT_PUBLIC = "https://api.languagetool.org/v2/check"
 
-# "en: some text" -> translate "some text" to English.
-TRANSLATE_RE = re.compile(r"^([a-zA-Z]{2}):\s*(.+)$", re.DOTALL)
-PREFIX_RE = re.compile(r"^([a-zA-Z]{2}):", re.DOTALL)
+# "en: some text" or "[en]: some text" or "{en]: some text" -> translate "some text" to English.
+PREFIX_RE = re.compile(r"^(?:\[|\{)?([a-zA-ZáéíóúñÁÉÍÓÚÑ]{2,12})(?:\]|\})?:", re.DOTALL)
+TRANSLATE_RE = re.compile(r"^(?:\[|\{)?([a-zA-ZáéíóúñÁÉÍÓÚÑ]{2,12})(?:\]|\})?:\s*(.+)$", re.DOTALL)
 
 LANG_NAMES = {
+    # 2-letter codes
     "en": "English", "es": "Spanish", "fr": "French", "de": "German",
     "it": "Italian", "pt": "Portuguese", "ca": "Catalan", "eu": "Basque",
     "gl": "Galician", "ru": "Russian", "uk": "Ukrainian", "zh": "Chinese",
@@ -40,6 +41,28 @@ LANG_NAMES = {
     "sv": "Swedish", "no": "Norwegian", "da": "Danish", "fi": "Finnish",
     "pl": "Polish", "cs": "Czech", "tr": "Turkish", "el": "Greek",
     "he": "Hebrew", "hi": "Hindi", "ro": "Romanian", "hu": "Hungarian",
+    # 3-letter codes
+    "eng": "English", "spa": "Spanish", "esp": "Spanish", "fra": "French",
+    "fre": "French", "deu": "German", "ger": "German", "ita": "Italian",
+    "por": "Portuguese", "cat": "Catalan", "eus": "Basque", "glg": "Galician",
+    "rus": "Russian", "ukr": "Ukrainian", "zho": "Chinese", "chi": "Chinese",
+    "jpn": "Japanese", "kor": "Korean", "ara": "Arabic", "nld": "Dutch",
+    "dut": "Dutch", "swe": "Swedish", "nor": "Norwegian", "dan": "Danish",
+    "fin": "Finnish", "pol": "Polish", "ces": "Czech", "cze": "Czech",
+    "tur": "Turkish", "ell": "Greek", "gre": "Greek", "heb": "Hebrew",
+    "hin": "Hindi", "ron": "Romanian", "rum": "Romanian", "hun": "Hungarian",
+    # Common full names in English and Spanish
+    "english": "English", "ingles": "English", "inglés": "English",
+    "spanish": "Spanish", "espanol": "Spanish", "español": "Spanish",
+    "french": "French", "frances": "French", "francés": "French",
+    "german": "German", "aleman": "German", "alemán": "German",
+    "italian": "Italian", "italiano": "Italian",
+    "portuguese": "Portuguese", "portugues": "Portuguese", "portugués": "Portuguese",
+    "catalan": "Catalan", "catalán": "Catalan",
+    "russian": "Russian", "ruso": "Russian",
+    "chinese": "Chinese", "chino": "Chinese",
+    "japanese": "Japanese", "japones": "Japanese", "japonés": "Japanese",
+    "korean": "Korean", "coreano": "Korean",
 }
 
 DEFAULT_MODELS = {
@@ -50,7 +73,7 @@ DEFAULT_MODELS = {
 
 
 def is_translation_prefix(text: str) -> bool:
-    """Check if the text begins with a valid language code prefix like 'en:'."""
+    """Check if the text begins with a valid language code prefix like 'en:', '[en]:', or '{es]:'."""
     m = PREFIX_RE.match(text.strip())
     return bool(m and m.group(1).lower() in LANG_NAMES)
 

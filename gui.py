@@ -63,9 +63,16 @@ class SettingsWindow:
         # Timeout
         timeout_frame = ttk.Frame(lf_general)
         timeout_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(timeout_frame, text="Pause before typing (seconds):").pack(side=tk.LEFT)
-        self.timeout_var = tk.StringVar(value=str(config.get("timeout", 0.3)))
-        ttk.Entry(timeout_frame, textvariable=self.timeout_var, width=8).pack(side=tk.RIGHT)
+        ttk.Label(timeout_frame, text="Pause before typing (seconds, max 3.0):").pack(side=tk.LEFT)
+        raw_timeout = config.get("timeout", 0.3)
+        try:
+            init_timeout = min(3.0, max(0.1, float(raw_timeout)))
+        except (ValueError, TypeError):
+            init_timeout = 0.3
+        self.timeout_var = tk.StringVar(value=str(init_timeout))
+        self.timeout_entry = ttk.Entry(timeout_frame, textvariable=self.timeout_var, width=8)
+        self.timeout_entry.pack(side=tk.RIGHT)
+        self.timeout_entry.bind("<FocusOut>", self._validate_timeout)
 
         # Autostart
         self.autostart_var = tk.BooleanVar(value=config.get("autostart", True))
@@ -176,12 +183,30 @@ class SettingsWindow:
         self.endpoint_var.set(prov_data.get("endpoint", ""))
         self.apikey_var.set(prov_data.get("api_key", ""))
 
+    def _validate_timeout(self, event=None):
+        try:
+            val = float(self.timeout_var.get())
+            if val > 3.0:
+                self.timeout_var.set("3.0")
+            elif val < 0.1:
+                self.timeout_var.set("0.1")
+        except ValueError:
+            pass
+
     def save_and_close(self):
         try:
             timeout = float(self.timeout_var.get())
         except ValueError:
             messagebox.showerror("Error", "Timeout must be a number.")
             return
+
+        # Never allow values higher than 3.0 seconds; round/clamp to 3.0
+        if timeout > 3.0:
+            timeout = 3.0
+            self.timeout_var.set("3.0")
+        elif timeout < 0.1:
+            timeout = 0.1
+            self.timeout_var.set("0.1")
 
         # Save current provider changes
         if hasattr(self, "_current_provider_key") and self._current_provider_key in self.providers:

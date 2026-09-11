@@ -51,19 +51,42 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 class Config:
     def __init__(self):
         self._data = DEFAULT_CONFIG.copy()
+        self._last_mtime: float = 0.0
         self.load()
 
     def load(self):
         if CONFIG_FILE.exists():
             try:
+                self._last_mtime = CONFIG_FILE.stat().st_mtime
                 with open(CONFIG_FILE, "r", encoding="utf-8-sig") as f:
                     loaded = json.load(f)
                     self._data = DEFAULT_CONFIG.copy()
                     self._merge(self._data, loaded)
+                    # Enforce timeout boundary (max 3.0 seconds, min 0.1 seconds)
+                    t = self._data.get("timeout")
+                    if isinstance(t, (int, float)):
+                        if t > 3.0:
+                            self._data["timeout"] = 3.0
+                            self.save()
+                        elif t < 0.1:
+                            self._data["timeout"] = 0.1
+                            self.save()
             except Exception:
                 pass
         else:
             self.save()
+
+    def check_reload(self) -> bool:
+        """Reload configuration if the file on disk was modified externally."""
+        try:
+            if CONFIG_FILE.exists():
+                mtime = CONFIG_FILE.stat().st_mtime
+                if mtime > self._last_mtime:
+                    self.load()
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _merge(self, base: Dict[str, Any], new: Dict[str, Any]):
         for k, v in new.items():
@@ -76,11 +99,21 @@ class Config:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=4)
+        try:
+            if CONFIG_FILE.exists():
+                self._last_mtime = CONFIG_FILE.stat().st_mtime
+        except Exception:
+            pass
 
     def get(self, key: str, default: Any = None) -> Any:
-        return self._data.get(key, default)
+        val = self._data.get(key, default)
+        if key == "timeout" and isinstance(val, (int, float)):
+            return min(3.0, max(0.1, float(val)))
+        return val
 
     def set(self, key: str, value: Any):
+        if key == "timeout" and isinstance(value, (int, float)):
+            value = min(3.0, max(0.1, float(value)))
         self._data[key] = value
         self.save()
 

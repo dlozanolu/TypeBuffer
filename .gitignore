@@ -28,3 +28,7 @@ TypeBuffer.log
 
 # PyInstaller one-off
 warn-*.txt
+
+# Agent cache & internal tools
+.atl/
+
