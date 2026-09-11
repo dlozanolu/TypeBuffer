@@ -35,7 +35,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startup"; Description: "Start TypeBuffer automatically when Windows starts"; GroupDescription: "Windows Startup:"; Flags: checked
+Name: "startup"; Description: "Start TypeBuffer automatically when Windows starts"; GroupDescription: "Windows Startup:"
 
 [Files]
 Source: "dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
