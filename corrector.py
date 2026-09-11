@@ -154,6 +154,11 @@ def _strip_quotes(out: str) -> str:
     return out
 
 
+def _has_meaningful_content(text: str) -> bool:
+    """True if the text contains at least one letter or digit (worth sending to an AI)."""
+    return any(ch.isalnum() for ch in text)
+
+
 def translate_text(text: str, timeout: float = 8.0) -> str | None:
     """
     Translates text if it matches the "lang: text" pattern.
@@ -163,6 +168,9 @@ def translate_text(text: str, timeout: float = 8.0) -> str | None:
     if not detected:
         return None
     code, source = detected
+    # Never send empty or punctuation-only text to the AI translator.
+    if not _has_meaningful_content(source):
+        return None
     target = LANG_NAMES[code]
 
     provider_id = config.get("ai_provider", "openai")
@@ -194,7 +202,8 @@ def correct_text(
     timeout: float = 8.0,
 ) -> str:
     text = text or ""
-    if not text.strip():
+    # Never send empty, whitespace-only, or punctuation-only text to the AI.
+    if not _has_meaningful_content(text):
         return text
 
     provider = provider or config.get("ai_provider", "openai")
