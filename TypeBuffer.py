@@ -23,7 +23,7 @@ from pathlib import Path
 from corrector import correct_text, translate_text, is_translation_prefix
 from config import config as app_config
 
-DEFAULT_TIMEOUT = 1.5
+DEFAULT_TIMEOUT = 0.3
 LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share") / "TypeBuffer"
 LOG_FILE = LOG_DIR / "typebuffer.log"
 
@@ -239,10 +239,10 @@ class TypeBufferApp:
         with self.lock:
             if self.buffer:
                 current_text = "".join(self.buffer)
-                # In translation mode, eliminate long waits: trigger quickly (0.35s)
+                # In translation mode, eliminate long waits: trigger quickly (min 0.15s)
                 # because the remote AI translation call itself introduces network latency.
                 is_translating = app_config.get("translate", True) and is_translation_prefix(current_text)
-                effective_timeout = 0.35 if is_translating else self.timeout
+                effective_timeout = min(0.15, self.timeout) if is_translating else self.timeout
                 if time.time() - self.last_type_time > effective_timeout:
                     texto = _sanitize_chars(current_text)
                     self.buffer.clear()
@@ -506,10 +506,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     setup_logging(quiet=args.quiet)
 
+    from single_instance import SingleInstance
+    single_inst = SingleInstance()
+    if single_inst.is_running():
+        msg = "TypeBuffer is already running! (Check the system tray icon near your clock)."
+        if not args.quiet:
+            print(msg)
+            if sys.platform == "win32":
+                try:
+                    import ctypes
+                    ctypes.windll.user32.MessageBoxW(0, msg, "TypeBuffer", 0x40 | 0x10000)
+                except Exception:
+                    pass
+        logging.warning("Another instance of TypeBuffer is already running. Exiting.")
+        return 0
+
     # Resolve settings: CLI override > config > default.
     provider = args.corrector or app_config.get("ai_provider", "languagetool")
     language = args.lang or app_config.get("lang", "en")
-    timeout = args.timeout if args.timeout is not None else app_config.get("timeout", 1.5)
+    timeout = args.timeout if args.timeout is not None else app_config.get("timeout", DEFAULT_TIMEOUT)
 
     # First-run welcome screen (skip in quiet/autostart mode).
     if app_config.get("first_run", True) and not args.quiet:
@@ -555,6 +570,7 @@ def main(argv: list[str] | None = None) -> int:
 
     app.stop()
     app_thread.join(timeout=2)
+    single_inst.release()
     return 0
 
 

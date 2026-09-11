@@ -74,6 +74,21 @@ class TrayIcon:
 
 
 if __name__ == "__main__":
+    import sys
+    from single_instance import SingleInstance
+
+    single_inst = SingleInstance()
+    if single_inst.is_running():
+        msg = "TypeBuffer is already running! (Check the system tray icon near your clock)."
+        print(msg)
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(0, msg, "TypeBuffer", 0x40 | 0x10000)
+            except Exception:
+                pass
+        sys.exit(0)
+
     print("Testing Tray Icon... Look at your system tray (near the clock).")
     print("Double-click the icon or use the menu to toggle pause/resume.")
     tray = TrayIcon(on_exit_callback=lambda: print("Exiting tray..."))
@@ -81,3 +96,5 @@ if __name__ == "__main__":
         tray.run()
     except KeyboardInterrupt:
         tray.stop()
+    finally:
+        single_inst.release()

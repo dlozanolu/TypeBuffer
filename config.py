@@ -8,7 +8,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "first_run": True,
-    "timeout": 1.5,
+    "timeout": 0.3,
     "autostart": True,
     "active": True,
     "spellcheck": True,
@@ -56,8 +56,9 @@ class Config:
     def load(self):
         if CONFIG_FILE.exists():
             try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                with open(CONFIG_FILE, "r", encoding="utf-8-sig") as f:
                     loaded = json.load(f)
+                    self._data = DEFAULT_CONFIG.copy()
                     self._merge(self._data, loaded)
             except Exception:
                 pass
@@ -84,7 +85,15 @@ class Config:
         self.save()
 
     def get_provider(self, provider_id: str) -> Dict[str, Any]:
-        return self._data.get("providers", {}).get(provider_id, {})
+        providers = self._data.get("providers", {})
+        if provider_id in providers:
+            return providers[provider_id]
+        # Case-insensitive match on key or display name
+        pid_lower = str(provider_id).lower()
+        for k, v in providers.items():
+            if k.lower() == pid_lower or v.get("name", "").lower() == pid_lower:
+                return v
+        return {}
 
     def set_provider(self, provider_id: str, name: str, endpoint: str, api_key: str, provider_type: str = "openai", model: str = ""):
         if "providers" not in self._data:

@@ -5,7 +5,7 @@ TypeBuffer is a masked keyboard input tool. It lets you type without anything ap
 ## Features
 
 - **Masks** normal typing (letters, symbols, spaces...).
-- After **1.5 seconds** of inactivity, it outputs the buffer into the active application.
+- After **0.3 seconds** of inactivity, it outputs the buffer into the active application.
 - **Spellchecker** (optional) using LanguageTool, OpenAI, Claude, DeepSeek, or any custom endpoint.
 - **Translation mode**: start a phrase with a 2-letter language code (e.g. `en: Hola mundo`) and it will be translated into that language by your AI provider.
 - **System tray icon** (Windows) to toggle on/off, open Settings, or exit.
@@ -48,7 +48,7 @@ On Windows, you can also use `TypeBuffer.bat`.
 
 ```bash
 python TypeBuffer.py
-python TypeBuffer.py --timeout 1.5
+python TypeBuffer.py --timeout 0.3
 python TypeBuffer.py --corrector openai
 python TypeBuffer.py --corrector claude
 python TypeBuffer.py --corrector deepseek
@@ -58,7 +58,7 @@ python TypeBuffer.py --quiet
 
 | Option | Description |
 |--------|-------------|
-| `--timeout` | Seconds of pause before flushing the text (default: 1.5) |
+| `--timeout` | Seconds of pause before flushing the text (default: 0.3) |
 | `--corrector` | AI/spellcheck provider: `languagetool`, `openai`, `claude`, `deepseek`, or `none` |
 | `--lang` | Language for the spellchecker (default: `en`) |
 | `--quiet` | Only log to file (useful for autostart setups) |
