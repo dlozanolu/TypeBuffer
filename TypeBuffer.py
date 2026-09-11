@@ -498,7 +498,7 @@ class TypeBufferApp:
                 return
 
         # 2) Spellchecker.
-        if app_config.get("spellcheck", True) and self.corrector not in ("none", "off", "no"):
+        if app_config.get("spellcheck", False) and self.corrector not in ("none", "off", "no"):
             logging.info("Checking (%s, %s)...", self.corrector, self.language)
             texto = correct_text(
                 texto,

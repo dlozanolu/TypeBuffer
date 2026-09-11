@@ -11,7 +11,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "timeout": 0.3,
     "autostart": True,
     "active": True,
-    "spellcheck": True,
+    "spellcheck": False,
     "translate": True,
     "lang": "en",
     "ai_provider": "openai",

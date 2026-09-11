@@ -83,7 +83,7 @@ class SettingsWindow:
         ).pack(anchor=tk.W, pady=2)
 
         # Spellcheck
-        self.spellcheck_var = tk.BooleanVar(value=config.get("spellcheck", True))
+        self.spellcheck_var = tk.BooleanVar(value=config.get("spellcheck", False))
         ttk.Checkbutton(
             lf_general,
             text="Enable spell checking and grammar correction",
