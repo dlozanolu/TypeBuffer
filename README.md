@@ -33,7 +33,18 @@ pip install -r requirements.txt
 | `pystray`| System tray icon (near the clock)|
 | `Pillow` | Image handling for the tray icon |
 
-## Quick Install
+## Installation
+
+### For Windows Users (Recommended)
+
+1. Download **`TypeBuffer-Setup.exe`** from [**Releases**](https://github.com/dlozanolu/TypeBuffer/releases).
+2. Run the installer. It configures the Start Menu shortcut, optional Desktop icon, and automatic startup with Windows.
+3. On first launch, the welcome screen opens automatically to configure your preferences and AI keys.
+4. **No Python or development tools required.**
+
+*Note: You can also download `TypeBuffer-windows.exe` for a portable single-file version without installation.*
+
+### For Developers (Run from Source)
 
 ```bash
 pip install -r requirements.txt
@@ -129,6 +140,7 @@ corrector.py          # Spellchecker + translator (multi-provider AI)
 config.py             # Settings storage (config.json)
 gui.py                # Welcome & Settings windows (tkinter)
 tray.py               # System tray icon (pystray)
+installer.iss         # Inno Setup Windows installer script
 setup_autostart.py    # Cross-platform login autostart script
 TypeBuffer.bat        # Windows launcher
 test_tray.bat         # Standalone tray icon test

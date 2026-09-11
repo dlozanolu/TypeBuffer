@@ -10,7 +10,7 @@ pip install -r requirements-dev.txt
 if errorlevel 1 pause & exit /b 1
 
 echo Building TypeBuffer.exe ...
-"%PY%" -m PyInstaller --noconfirm --clean --onefile --noconsole --name TypeBuffer TypeBuffer.py
+"%PY%" -m PyInstaller --noconfirm --clean --onefile --noconsole --add-data "assets;assets" --icon "assets/icon.ico" --name TypeBuffer TypeBuffer.py
 if errorlevel 1 pause & exit /b 1
 
 echo.

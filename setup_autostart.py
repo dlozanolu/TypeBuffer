@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parent
 
 def resolve_target() -> Path:
     """Prefers the compiled binary; otherwise, falls back to the .py script."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable)
     system = platform.system()
     if system == "Windows":
         exe = ROOT / "dist" / f"{APP_NAME}.exe"

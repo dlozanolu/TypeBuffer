@@ -1,3 +1,4 @@
+import sys
 import threading
 from pathlib import Path
 from PIL import Image
@@ -7,7 +8,25 @@ from pystray import MenuItem as item
 from config import config
 from gui import show_settings
 
-ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+
+def _resolve_assets_dir() -> Path:
+    # 1. PyInstaller onefile unpacked temp directory
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        meipass_assets = Path(sys._MEIPASS) / "assets"
+        if meipass_assets.exists():
+            return meipass_assets
+    # 2. Alongside the executable (e.g. installed app directory)
+    exe_assets = Path(sys.executable).resolve().parent / "assets"
+    if exe_assets.exists():
+        return exe_assets
+    # 3. Source directory
+    src_assets = Path(__file__).resolve().parent / "assets"
+    if src_assets.exists():
+        return src_assets
+    return Path("assets")
+
+
+ASSETS_DIR = _resolve_assets_dir()
 
 
 class TrayIcon:

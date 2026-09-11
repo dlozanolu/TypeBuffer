@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*' # Trigger on tags like v1.0.0
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release version tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
 
 jobs:
   build:
@@ -13,13 +19,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: TypeBuffer
             asset_name: TypeBuffer-linux
           - os: windows-latest
-            artifact_name: TypeBuffer.exe
-            asset_name: TypeBuffer-windows.exe
+            asset_name: TypeBuffer-windows
           - os: macos-latest
-            artifact_name: TypeBuffer
             asset_name: TypeBuffer-macos
 
     steps:
@@ -36,15 +39,43 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          pyinstaller --noconfirm --clean --onefile --noconsole --name TypeBuffer TypeBuffer.py
+          pyinstaller --noconfirm --clean --onefile --noconsole --add-data "assets:assets" --name TypeBuffer TypeBuffer.py
 
-      - name: Upload Artifact
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --noconfirm --clean --onefile --noconsole --add-data "assets;assets" --icon "assets/icon.ico" --name TypeBuffer TypeBuffer.py
+
+      - name: Build Windows Installer (Inno Setup)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $rawTag = "${{ github.event.inputs.tag_name || github.ref_name }}"
+          if ($rawTag -match '^v?(.+)$') { $ver = $matches[1] } else { $ver = "1.0.0" }
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$ver installer.iss
+
+      - name: Prepare Artifacts for Upload
+        shell: bash
+        run: |
+          mkdir -p dist/upload
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp dist/TypeBuffer.exe dist/upload/TypeBuffer-windows.exe
+            cp dist/installer/TypeBuffer-Setup.exe dist/upload/TypeBuffer-Setup.exe
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            cp dist/TypeBuffer dist/upload/TypeBuffer-macos
+          else
+            cp dist/TypeBuffer dist/upload/TypeBuffer-linux
+          fi
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.artifact_name }}
+          path: dist/upload/*
 
   release:
     name: Create Release
@@ -60,14 +91,15 @@ jobs:
 
       - name: Prepare Release Assets
         run: |
-          mkdir release_assets
-          # Move artifacts from their directories to a single flat directory
+          mkdir -p release_assets
+          # Flatten artifacts from subdirectories
           find artifacts -type f -exec mv {} release_assets/ \;
-          ls -l release_assets/
+          ls -la release_assets/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           files: release_assets/*
           draft: false
           prerelease: false
