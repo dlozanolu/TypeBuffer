@@ -15,6 +15,10 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # id-token: write is required for Azure OIDC (workload identity) sign-in.
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       matrix:
         include:
@@ -49,6 +53,28 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onefile --noconsole --add-data "assets;assets" --icon "assets/icon.ico" --name TypeBuffer TypeBuffer.py
 
+      # Sign the portable executable BEFORE it gets embedded into the installer,
+      # so both the portable file and the installed copy carry a valid signature.
+      - name: Azure login (OIDC)
+        if: runner.os == 'Windows' && vars.AZURE_SIGNING_ENABLED == 'true'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign portable TypeBuffer.exe
+        if: runner.os == 'Windows' && vars.AZURE_SIGNING_ENABLED == 'true'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ github.workspace }}\dist\TypeBuffer.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
       - name: Build Windows Installer (Inno Setup)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -57,6 +83,18 @@ jobs:
           $rawTag = "${{ github.event.inputs.tag_name || github.ref_name }}"
           if ($rawTag -match '^v?(.+)$') { $ver = $matches[1] } else { $ver = "1.0.0" }
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$ver installer.iss
+
+      - name: Sign installer TypeBuffer-Setup.exe
+        if: runner.os == 'Windows' && vars.AZURE_SIGNING_ENABLED == 'true'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ github.workspace }}\dist\installer\TypeBuffer-Setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Prepare Artifacts for Upload
         shell: bash

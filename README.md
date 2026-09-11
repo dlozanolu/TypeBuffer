@@ -123,6 +123,26 @@ bash build.sh
 
 The binary will be placed in `dist/TypeBuffer` (or `TypeBuffer.exe`). GitHub Actions are provided to automatically build cross-platform releases on new tags.
 
+## Code Signing (Windows SmartScreen)
+
+Unsigned Windows executables trigger the "Windows protected your PC" SmartScreen warning when downloaded from the internet. To remove it, sign the Windows binaries with [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/). The release workflow already contains the signing steps (using the [`azure/artifact-signing-action`](https://github.com/Azure/trusted-signing-action)), gated behind a repository variable so releases still work before signing is configured.
+
+To enable signing:
+
+1. Create an [Azure Trusted Signing account](https://learn.microsoft.com/azure/trusted-signing/quickstart?tabs=registerrp-portal%2Caccount-portal) and a certificate profile.
+2. Create an App Registration (service principal) and grant it the **Artifact Signing Certificate Profile Signer** role.
+3. Configure [OpenID Connect (OIDC) federation](https://learn.microsoft.com/azure/trusted-signing/how-to-signing-integrations) between GitHub and Azure (a federated credential for this repository).
+4. Add these secrets in **Settings → Secrets and variables → Actions**:
+   - `AZURE_CLIENT_ID`
+   - `AZURE_TENANT_ID`
+   - `AZURE_SUBSCRIPTION_ID`
+   - `AZURE_SIGNING_ENDPOINT` (e.g. `https://eus.codesigning.azure.net/`)
+   - `AZURE_SIGNING_ACCOUNT_NAME`
+   - `AZURE_CERTIFICATE_PROFILE_NAME`
+5. Add a repository **variable** `AZURE_SIGNING_ENABLED` set to `true`.
+
+Once enabled, the next release will produce signed `TypeBuffer-Setup.exe` and `TypeBuffer-windows.exe` files with no SmartScreen warning.
+
 ## Login Autostart (Run at Startup)
 
 ```bash
