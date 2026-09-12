@@ -113,6 +113,48 @@ if sys.platform == "win32":
         user32.UnhookWindowsHookEx.restype = wintypes.BOOL
 
     _setup_user32_hook_apis()
+
+    INPUT_KEYBOARD = 1
+    KEYEVENTF_KEYUP = 0x0002
+    KEYEVENTF_UNICODE = 0x0004
+    MAPVK_VK_TO_VSC = 0
+    _ULONG_PTR = ctypes.c_size_t
+
+    class _KEYBDINPUT(ctypes.Structure):
+        _fields_ = [
+            ("wVk", wintypes.WORD),
+            ("wScan", wintypes.WORD),
+            ("dwFlags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", _ULONG_PTR),
+        ]
+
+    class _MOUSEINPUT(ctypes.Structure):
+        _fields_ = [
+            ("dx", wintypes.LONG),
+            ("dy", wintypes.LONG),
+            ("mouseData", wintypes.DWORD),
+            ("dwFlags", wintypes.DWORD),
+            ("time", wintypes.DWORD),
+            ("dwExtraInfo", _ULONG_PTR),
+        ]
+
+    class _HARDWAREINPUT(ctypes.Structure):
+        _fields_ = [
+            ("uMsg", wintypes.DWORD),
+            ("wParamL", wintypes.WORD),
+            ("wParamH", wintypes.WORD),
+        ]
+
+    class _INPUTUNION(ctypes.Union):
+        _fields_ = [("ki", _KEYBDINPUT), ("mi", _MOUSEINPUT), ("hi", _HARDWAREINPUT)]
+
+    class INPUT(ctypes.Structure):
+        _anonymous_ = ("value",)
+        _fields_ = [("type", wintypes.DWORD), ("value", _INPUTUNION)]
+
+    ctypes.windll.user32.SendInput.argtypes = [wintypes.UINT, ctypes.c_void_p, ctypes.c_int]
+    ctypes.windll.user32.SendInput.restype = wintypes.UINT
 else:
     _HOOKPROC = None
 
@@ -185,6 +227,50 @@ def parse_hotkey(spec: str) -> tuple[frozenset[str], int] | None:
     if not mods and key_vk not in _STANDALONE_SAFE_VK:
         return None
     return frozenset(mods), key_vk
+
+
+def _win_send_text(text: str) -> None:
+    """
+    Injects text on Windows as literal UTF-16 units (KEYEVENTF_UNICODE).
+
+    Sending real virtual keys instead would let whatever modifier the user
+    happens to be holding rewrite the batch: with Shift down a Spanish layout
+    turns 'www.allwr.io' into 'WWW:ALLWR:IO'. Unicode injection carries the
+    character itself, so the keyboard state cannot alter it. Enter and Tab
+    still need real keys, since apps act on the keystroke rather than the
+    control character.
+    """
+    user32 = ctypes.windll.user32
+    events: list[INPUT] = []
+
+    def add(vk: int, scan: int, flags: int) -> None:
+        item = INPUT(type=INPUT_KEYBOARD)
+        item.ki = _KEYBDINPUT(wVk=vk, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=0)
+        events.append(item)
+
+    def add_key(vk: int) -> None:
+        scan = user32.MapVirtualKeyW(vk, MAPVK_VK_TO_VSC)
+        add(vk, scan, 0)
+        add(vk, scan, KEYEVENTF_KEYUP)
+
+    for ch in text:
+        if ch == "\n":
+            add_key(VK_RETURN)
+        elif ch == "\t":
+            add_key(VK_TAB)
+        else:
+            # Characters outside the BMP need both surrogate halves.
+            data = ch.encode("utf-16-le")
+            for i in range(0, len(data), 2):
+                unit = data[i] | (data[i + 1] << 8)
+                add(0, unit, KEYEVENTF_UNICODE)
+                add(0, unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP)
+
+    # Sent in chunks so very long AI-corrected paragraphs are not dropped.
+    for start in range(0, len(events), 256):
+        chunk = events[start : start + 256]
+        array = (INPUT * len(chunk))(*chunk)
+        user32.SendInput(len(chunk), ctypes.byref(array), ctypes.sizeof(INPUT))
 
 
 def setup_logging(quiet: bool) -> None:
@@ -560,11 +646,14 @@ class TypeBufferApp:
             self._thread.join(timeout=2)
 
     def _type_text(self, texto: str) -> None:
+        # LLKHF_INJECTED -> the hook won't mask these again
+        if sys.platform == "win32":
+            _win_send_text(texto)
+            return
         if self._controller is None:
             from pynput.keyboard import Controller
 
             self._controller = Controller()
-        # LLKHF_INJECTED -> the hook won't mask them again
         self._controller.type(texto)
 
     def _start_pynput(self) -> None:
