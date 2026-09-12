@@ -14,6 +14,15 @@ TypeBuffer is a masked keyboard input tool. It lets you type without anything ap
 
 > **Note for Windows:** It uses a low-level `WH_KEYBOARD_LL` hook with selective blocking. A Windows *Service* (Session 0) cannot capture the desktop keyboard; use the included autostart script to run it at user login instead.
 
+## Why TypeBuffer? The Ergonomics of Blind Flow
+
+Most typing tools and operating systems assume you require continuous on-screen feedback. But for experienced typists with developed muscle memory, constant visual feedback introduces subtle cognitive friction:
+
+- **Cognitive Load & Flow State (Bypassing the Visual "Supervisor")**: When typing with standard feedback, the brain enters an endless supervisory loop: idea generation → motor typing → visual reading → micro-editing. The visual cortex acts as an uninvited supervisor, prompting you to pause or tweak phrases mid-thought. Suppressing immediate feedback routes mental ideas directly to motor execution, letting you type at the exact speed of thought.
+- **Genuine Sensory & Visual Rest**: Typing with eyes closed or resting off-screen relieves digital eye strain—eliminating monitor flicker, blue light exposure, ocular muscle tension, and the dry-eye syndrome caused by unblinking screen focus.
+- **Why Blind Typing Isn't Usually Recommended (The Expert Typist Paradox)**: Traditional touch typing courses strictly mandate visual monitoring because novice or casual typists easily commit accidental typos or subtle hand displacements off the home row, resulting in lines of unreadable gibberish before they notice. However, for precision typists with ingrained muscle memory, screenless typing becomes an extraordinary instrument of direct mental dictation.
+- **The Intelligent Safety Net**: Even for precision writers, TypeBuffer provides complete peace of mind. Your thoughts are held in a silent buffer until you pause, and with optional AI proofreading or language prefixes (`en:`, `fr:`, `es:`), any minor slip or cross-language translation is resolved cleanly before it lands in your target application.
+
 ## Requirements
 
 - **Python 3.10+**
