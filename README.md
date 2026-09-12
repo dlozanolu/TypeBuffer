@@ -82,7 +82,16 @@ python TypeBuffer.py --quiet
 | `--corrector` | AI/spellcheck provider: `languagetool`, `openai`, `claude`, `deepseek`, or `none` |
 | `--lang` | Language for the spellchecker (default: `en`) |
 | `--quiet` | Only log to file (useful for autostart setups) |
-| `ESC` | Exits masked mode |
+
+### Pause & Resume Shortcut
+
+Press **`Ctrl+Shift+Space`** at any time to pause or resume masking. The tray icon switches colour to reflect the current state, and pausing clears whatever is still sitting in the buffer.
+
+The shortcut deliberately avoids `Ctrl+Alt+<key>` combinations: on Spanish and other international layouts `AltGr` is reported as `Ctrl+Alt`, so such a shortcut would collide with everyday characters like `@`, `€`, `[` or `{`.
+
+You can change it under *Settings → Pause/resume shortcut*, or by editing `hotkey_toggle` in `config.json`. Accepted forms are modifier combinations (`ctrl+shift+f9`, `win+alt+t`) and standalone keys that are never used for typing (`pause`, `scrolllock`, `f1`–`f24`). A bare printable key is rejected, since it would swallow normal typing.
+
+To exit completely, right-click the tray icon and choose **Exit**. `ESC` is passed straight through to the active application.
 
 ### Translation Mode
 

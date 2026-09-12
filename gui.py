@@ -20,7 +20,7 @@ class SettingsWindow:
 
         self.root = tk.Tk()
         self.root.title("TypeBuffer Settings" if not is_welcome else "Welcome to TypeBuffer")
-        self.root.geometry("500x650")
+        self.root.geometry("500x700")
         self.root.resizable(False, False)
 
         # Center window
@@ -73,6 +73,13 @@ class SettingsWindow:
         self.timeout_entry = ttk.Entry(timeout_frame, textvariable=self.timeout_var, width=8)
         self.timeout_entry.pack(side=tk.RIGHT)
         self.timeout_entry.bind("<FocusOut>", self._validate_timeout)
+
+        # Pause/resume shortcut
+        hotkey_frame = ttk.Frame(lf_general)
+        hotkey_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(hotkey_frame, text="Pause/resume shortcut:").pack(side=tk.LEFT)
+        self.hotkey_var = tk.StringVar(value=str(config.get("hotkey_toggle", "ctrl+shift+space")))
+        ttk.Entry(hotkey_frame, textvariable=self.hotkey_var, width=20).pack(side=tk.RIGHT)
 
         # Autostart
         self.autostart_var = tk.BooleanVar(value=config.get("autostart", True))
@@ -208,12 +215,24 @@ class SettingsWindow:
             timeout = 0.1
             self.timeout_var.set("0.1")
 
+        from TypeBuffer import parse_hotkey
+
+        hotkey = self.hotkey_var.get().strip().lower()
+        if parse_hotkey(hotkey) is None:
+            messagebox.showerror(
+                "Error",
+                "Invalid shortcut. Use a combination such as 'ctrl+shift+space', "
+                "'ctrl+shift+f9' or a standalone 'pause' key.",
+            )
+            return
+
         # Save current provider changes
         if hasattr(self, "_current_provider_key") and self._current_provider_key in self.providers:
             self.providers[self._current_provider_key]["endpoint"] = self.endpoint_var.get().strip()
             self.providers[self._current_provider_key]["api_key"] = self.apikey_var.get().strip()
 
         config.set("timeout", timeout)
+        config.set("hotkey_toggle", hotkey)
         config.set("autostart", self.autostart_var.get())
         config.set("spellcheck", self.spellcheck_var.get())
         config.set("translate", self.translate_var.get())

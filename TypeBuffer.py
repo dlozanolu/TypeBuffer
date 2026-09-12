@@ -24,6 +24,7 @@ from corrector import correct_text, translate_text, is_translation_prefix, detec
 from config import config as app_config
 
 DEFAULT_TIMEOUT = 0.3
+DEFAULT_HOTKEY = "ctrl+shift+space"
 LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share") / "TypeBuffer"
 LOG_FILE = LOG_DIR / "typebuffer.log"
 
@@ -35,7 +36,7 @@ LLKHF_INJECTED = 0x10
 
 VK_BACK, VK_TAB, VK_RETURN = 0x08, 0x09, 0x0D
 VK_SHIFT, VK_CONTROL, VK_MENU = 0x10, 0x11, 0x12
-VK_CAPITAL, VK_ESCAPE, VK_SPACE = 0x14, 0x1B, 0x20
+VK_PAUSE, VK_CAPITAL, VK_ESCAPE, VK_SPACE = 0x13, 0x14, 0x1B, 0x20
 VK_PRIOR, VK_NEXT, VK_END, VK_HOME = 0x21, 0x22, 0x23, 0x24
 VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN = 0x25, 0x26, 0x27, 0x28
 VK_SNAPSHOT, VK_INSERT, VK_DELETE = 0x2C, 0x2D, 0x2E
@@ -63,6 +64,8 @@ _PASSTHROUGH_VK = frozenset(
         VK_APPS,
         VK_NUMLOCK,
         VK_SCROLL,
+        VK_PAUSE,
+        VK_ESCAPE,
         VK_SNAPSHOT,
         VK_INSERT,
         VK_DELETE,
@@ -112,6 +115,76 @@ if sys.platform == "win32":
     _setup_user32_hook_apis()
 else:
     _HOOKPROC = None
+
+
+_MODIFIER_ALIASES = {
+    "ctrl": "ctrl",
+    "control": "ctrl",
+    "shift": "shift",
+    "alt": "alt",
+    "win": "win",
+    "super": "win",
+    "cmd": "win",
+    "meta": "win",
+}
+
+_HOTKEY_VK_NAMES = {
+    "space": VK_SPACE,
+    "enter": VK_RETURN,
+    "return": VK_RETURN,
+    "tab": VK_TAB,
+    "esc": VK_ESCAPE,
+    "escape": VK_ESCAPE,
+    "backspace": VK_BACK,
+    "pause": VK_PAUSE,
+    "break": VK_PAUSE,
+    "scrolllock": VK_SCROLL,
+    "capslock": VK_CAPITAL,
+    "insert": VK_INSERT,
+    "delete": VK_DELETE,
+    "home": VK_HOME,
+    "end": VK_END,
+    "pageup": VK_PRIOR,
+    "pagedown": VK_NEXT,
+    "left": VK_LEFT,
+    "right": VK_RIGHT,
+    "up": VK_UP,
+    "down": VK_DOWN,
+}
+_HOTKEY_VK_NAMES.update({f"f{i}": VK_F1 + i - 1 for i in range(1, 25)})
+
+# Keys that are safe to use on their own, without any modifier.
+_STANDALONE_SAFE_VK = frozenset({VK_PAUSE, VK_SCROLL, *range(VK_F1, VK_F24 + 1)})
+
+
+def parse_hotkey(spec: str) -> tuple[frozenset[str], int] | None:
+    """
+    Parses a shortcut such as 'ctrl+shift+space' into ({'ctrl', 'shift'}, VK_SPACE).
+    Returns None when the shortcut is malformed or too dangerous to bind globally
+    (a bare printable key would swallow normal typing).
+    """
+    if not isinstance(spec, str):
+        return None
+
+    mods: set[str] = set()
+    key_vk: int | None = None
+    for part in spec.lower().replace(" ", "").split("+"):
+        if not part:
+            continue
+        if part in _MODIFIER_ALIASES:
+            mods.add(_MODIFIER_ALIASES[part])
+        elif part in _HOTKEY_VK_NAMES:
+            key_vk = _HOTKEY_VK_NAMES[part]
+        elif len(part) == 1 and part.isalnum():
+            key_vk = ord(part.upper())
+        else:
+            return None
+
+    if key_vk is None:
+        return None
+    if not mods and key_vk not in _STANDALONE_SAFE_VK:
+        return None
+    return frozenset(mods), key_vk
 
 
 def setup_logging(quiet: bool) -> None:
@@ -208,7 +281,13 @@ class TypeBufferApp:
         # Keys whose KEYDOWN we block -> we also block their KEYUP
         self._blocked_downs: set[int] = set()
         self._on_stop_callback = None
+        self._on_toggle_request = None
         self._last_config_check = time.time()
+        # Toggle requests are raised by the hook thread and applied by the run loop,
+        # so the hook procedure stays well under Windows' LowLevelHooksTimeout.
+        self._toggle_requested = False
+        self._hotkey_spec: str | None = None
+        self._hotkey_parsed: tuple[frozenset[str], int] | None = None
 
     @property
     def timeout(self) -> float:
@@ -240,6 +319,19 @@ class TypeBufferApp:
     def active(self, value: bool) -> None:
         app_config.set("active", value)
 
+    @property
+    def hotkey(self) -> tuple[frozenset[str], int] | None:
+        """Parsed pause/resume shortcut, re-parsed only when the setting changes."""
+        spec = app_config.get("hotkey_toggle", DEFAULT_HOTKEY)
+        if spec != self._hotkey_spec:
+            self._hotkey_spec = spec
+            parsed = parse_hotkey(spec)
+            if parsed is None:
+                logging.warning("Invalid shortcut %r, falling back to %s", spec, DEFAULT_HOTKEY)
+                parsed = parse_hotkey(DEFAULT_HOTKEY)
+            self._hotkey_parsed = parsed
+        return self._hotkey_parsed
+
     def reload_config(self) -> None:
         """Reloads settings from disk and applies them immediately."""
         app_config.load()
@@ -261,6 +353,32 @@ class TypeBufferApp:
 
     def set_on_stop(self, callback) -> None:
         self._on_stop_callback = callback
+
+    def set_on_toggle_request(self, callback) -> None:
+        """Routes hotkey toggles through the tray icon so its state stays in sync."""
+        self._on_toggle_request = callback
+
+    def _hotkey_matches(self, vk: int) -> bool:
+        parsed = self.hotkey
+        if parsed is None:
+            return False
+        mods, target_vk = parsed
+        if vk != target_vk:
+            return False
+        # Modifiers must match exactly: on Spanish layouts AltGr reports as Ctrl+Alt,
+        # so a Ctrl-only shortcut must not fire while typing '@' or '€'.
+        return (
+            ("ctrl" in mods) == _down(VK_CONTROL)
+            and ("shift" in mods) == _down(VK_SHIFT)
+            and ("alt" in mods) == _down(VK_MENU)
+            and ("win" in mods) == (_down(VK_LWIN) or _down(VK_RWIN))
+        )
+
+    def _apply_toggle_request(self) -> None:
+        if self._on_toggle_request:
+            self._on_toggle_request()
+        else:
+            self.set_active(not self.active)
 
     def stop(self) -> None:
         self.running = False
@@ -326,9 +444,6 @@ class TypeBufferApp:
     def _should_block_down(self, vk: int, scan: int) -> bool:
         if not self.active:
             return False
-        if vk == VK_ESCAPE:
-            self.running = False
-            return True
 
         if vk in _PASSTHROUGH_VK:
             return False
@@ -387,6 +502,12 @@ class TypeBufferApp:
                     vk = int(kb.vkCode)
 
                     if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                        # Checked before anything else so it also works while paused.
+                        if self._hotkey_matches(vk):
+                            self._toggle_requested = True
+                            self._blocked_downs.add(vk)
+                            return 1
+
                         if self._should_block_down(vk, int(kb.scanCode)):
                             self._blocked_downs.add(vk)
                             return 1
@@ -395,8 +516,6 @@ class TypeBufferApp:
                     elif wParam in (WM_KEYUP, WM_SYSKEYUP):
                         if vk in self._blocked_downs:
                             self._blocked_downs.discard(vk)
-                            return 1
-                        if vk == VK_ESCAPE:
                             return 1
         except Exception:
             logging.exception("Error in keyboard hook")
@@ -453,10 +572,48 @@ class TypeBufferApp:
 
         self._controller = keyboard.Controller()
 
-        def on_press(key):
-            if key == keyboard.Key.esc:
-                self.running = False
+        modifier_keys = {
+            keyboard.Key.ctrl: "ctrl",
+            keyboard.Key.ctrl_l: "ctrl",
+            keyboard.Key.ctrl_r: "ctrl",
+            keyboard.Key.shift: "shift",
+            keyboard.Key.shift_l: "shift",
+            keyboard.Key.shift_r: "shift",
+            keyboard.Key.alt: "alt",
+            keyboard.Key.alt_l: "alt",
+            keyboard.Key.alt_r: "alt",
+            keyboard.Key.cmd: "win",
+        }
+        held: set[str] = set()
+
+        def is_hotkey(key) -> bool:
+            parsed = self.hotkey
+            if parsed is None:
                 return False
+            mods, target_vk = parsed
+            vk = getattr(key, "vk", None)
+            if vk is None:
+                char = getattr(key, "char", None)
+                vk = ord(char.upper()) if char and char.isalnum() else None
+            if vk is None or vk != target_vk:
+                return False
+            return held == set(mods)
+
+        def on_release(key):
+            name = modifier_keys.get(key)
+            if name:
+                held.discard(name)
+
+        def on_press(key):
+            name = modifier_keys.get(key)
+            if name:
+                held.add(name)
+                return
+            if is_hotkey(key):
+                self._toggle_requested = True
+                return
+            if not self.active:
+                return
             try:
                 if key.char and ord(key.char) >= 32:
                     self._push(key.char)
@@ -478,7 +635,9 @@ class TypeBufferApp:
             elif key == keyboard.Key.backspace:
                 self._backspace()
 
-        self._pynput_listener = keyboard.Listener(on_press=on_press, suppress=True)
+        self._pynput_listener = keyboard.Listener(
+            on_press=on_press, on_release=on_release, suppress=True
+        )
         self._pynput_listener.start()
 
     def _prepare_and_type(self, texto: str) -> None:
@@ -511,9 +670,13 @@ class TypeBufferApp:
         self._type_text(texto)
 
     def run(self) -> None:
-        logging.info("MASKED MODE (timeout=%.1fs). ESC to exit.", self.timeout)
+        logging.info("MASKED MODE (timeout=%.1fs).", self.timeout)
         logging.info(
-            "Instant pass-through: arrows, Caps Lock, Ctrl+C/V, Alt, Win, Del, F-keys..."
+            "Pause/resume shortcut: %s (exit from the tray icon)",
+            app_config.get("hotkey_toggle", DEFAULT_HOTKEY),
+        )
+        logging.info(
+            "Instant pass-through: arrows, Esc, Caps Lock, Ctrl+C/V, Alt, Win, Del, F-keys..."
         )
         logging.info("Spellchecker: %s (lang=%s)", self.corrector, self.language)
         logging.info("Translation mode: %s", app_config.get("translate", True))
@@ -528,6 +691,11 @@ class TypeBufferApp:
         try:
             while self.running:
                 time.sleep(0.05)
+
+                if self._toggle_requested:
+                    self._toggle_requested = False
+                    self._apply_toggle_request()
+
                 now = time.time()
                 if now - self._last_config_check > 1.0:
                     self._last_config_check = now
@@ -629,6 +797,7 @@ def main(argv: list[str] | None = None) -> int:
             on_settings_saved_callback=app.reload_config,
         )
         app.set_on_stop(lambda: tray.stop() if tray else None)
+        app.set_on_toggle_request(tray.toggle_active)
     except Exception as exc:
         logging.warning("Could not start the tray icon: %s", exc)
 
