@@ -22,6 +22,8 @@ from pathlib import Path
 
 from corrector import correct_text, translate_text, is_translation_prefix, detect_translation
 from config import config as app_config
+from updater import check_for_update, is_packaged_build
+from version import __version__
 
 DEFAULT_TIMEOUT = 0.3
 DEFAULT_HOTKEY = "ctrl+shift+space"
@@ -771,7 +773,7 @@ class TypeBufferApp:
         self._type_text(texto)
 
     def run(self) -> None:
-        logging.info("MASKED MODE (timeout=%.1fs).", self.timeout)
+        logging.info("TypeBuffer %s — MASKED MODE (timeout=%.1fs).", __version__, self.timeout)
         logging.info(
             "Pause/resume shortcut: %s (exit from the tray icon)",
             app_config.get("hotkey_toggle", DEFAULT_HOTKEY),
@@ -845,6 +847,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
+def _announce_update_if_any(tray) -> None:
+    """Looks for a newer release and surfaces it on the tray icon."""
+    if not is_packaged_build():
+        logging.info("Running from source; skipping the update check.")
+        return
+
+    # Give the tray icon a moment to appear, otherwise the notification is lost.
+    time.sleep(3)
+    found = check_for_update()
+    if found:
+        tray.announce_update(*found)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     setup_logging(quiet=args.quiet)
@@ -903,6 +918,14 @@ def main(argv: list[str] | None = None) -> int:
         app.set_on_toggle_request(tray.toggle_active)
     except Exception as exc:
         logging.warning("Could not start the tray icon: %s", exc)
+
+    if tray is not None and app_config.get("check_updates", True):
+        threading.Thread(
+            target=_announce_update_if_any,
+            args=(tray,),
+            daemon=True,
+            name="update-check",
+        ).start()
 
     # Run the keyboard hook in a background thread.
     app_thread = threading.Thread(target=app.run, daemon=True, name="typebuffer-app")

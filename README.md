@@ -83,6 +83,12 @@ python TypeBuffer.py --quiet
 | `--lang` | Language for the spellchecker (default: `en`) |
 | `--quiet` | Only log to file (useful for autostart setups) |
 
+### Update Notifications
+
+Installed builds ask GitHub Releases once per start whether a newer version exists. When there is one, a notification appears next to the clock and a **Get version X.Y.Z...** entry is added to the tray menu, which opens the download page.
+
+Nothing is ever downloaded or installed on your behalf. The check runs in a background thread with a short timeout and fails silently when offline, it is skipped entirely when running from source, and you can turn it off under *Settings → Check for new versions on startup* or with `check_updates` in `config.json`.
+
 ### Flushing on Demand
 
 Normally the buffer is released once you stop typing for the configured pause. Pressing **`Enter`** releases it right away instead, with no wait at all, and the newline is delivered after the text — so in a chat window your message is typed out and sent in one go.

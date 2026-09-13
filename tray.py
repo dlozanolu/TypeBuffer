@@ -1,5 +1,6 @@
 import sys
 import threading
+import webbrowser
 from pathlib import Path
 from PIL import Image
 import pystray
@@ -44,6 +45,7 @@ class TrayIcon:
             self.icon_inactive = Image.new('RGB', (64, 64), color=(255, 0, 0))
 
         self.is_active = config.get("active", True)
+        self.update_info: tuple[str, str] | None = None
 
         self.icon = pystray.Icon(
             "TypeBuffer",
@@ -54,16 +56,36 @@ class TrayIcon:
 
     def update_menu(self):
         # The item with `default=True` is triggered by double-click on the tray icon.
-        self.icon.menu = pystray.Menu(
+        entries = [
             item(
                 'Pause TypeBuffer' if self.is_active else 'Resume TypeBuffer',
                 self.toggle_active,
                 default=True,
             ),
             pystray.Menu.SEPARATOR,
-            item('Settings...', self.open_settings),
-            item('Exit', self.exit_app),
-        )
+        ]
+        if self.update_info:
+            entries.append(item(f'Get version {self.update_info[0]}...', self.open_update))
+            entries.append(pystray.Menu.SEPARATOR)
+        entries.append(item('Settings...', self.open_settings))
+        entries.append(item('Exit', self.exit_app))
+        self.icon.menu = pystray.Menu(*entries)
+
+    def announce_update(self, version: str, url: str):
+        """Adds a download entry to the menu and shows a one-off notification."""
+        self.update_info = (version, url)
+        self.update_menu()
+        try:
+            self.icon.notify(
+                f"Version {version} is available. Open the tray menu to download it.",
+                "TypeBuffer update",
+            )
+        except Exception as e:
+            print(f"Could not show the update notification: {e}")
+
+    def open_update(self, icon=None, item=None):
+        if self.update_info:
+            webbrowser.open(self.update_info[1])
 
     def toggle_active(self, icon=None, item=None):
         self.set_active(not self.is_active)

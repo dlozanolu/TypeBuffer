@@ -12,6 +12,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "autostart": True,
     "active": True,
     "hotkey_toggle": "ctrl+shift+space",
+    "check_updates": True,
     "spellcheck": False,
     "translate": True,
     "lang": "en",

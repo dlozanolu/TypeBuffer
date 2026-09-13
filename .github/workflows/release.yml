@@ -15,6 +15,9 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # Entra federated credentials cannot wildcard tag names, so the OIDC subject
+    # is bound to this environment instead of the tag that triggered the run.
+    environment: release
     # id-token: write is required for Azure OIDC (workload identity) sign-in.
     permissions:
       contents: read
@@ -42,6 +45,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+
+      - name: Stamp version from tag
+        shell: bash
+        run: |
+          RAW="${{ github.event.inputs.tag_name || github.ref_name }}"
+          VERSION="${RAW#v}"
+          printf '"""Generated at build time from the git tag."""\n\n__version__ = "%s"\n' "$VERSION" > version.py
+          cat version.py
 
       - name: Build with PyInstaller (Linux/macOS)
         if: runner.os != 'Windows'
