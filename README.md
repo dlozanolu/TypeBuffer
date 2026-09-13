@@ -83,6 +83,12 @@ python TypeBuffer.py --quiet
 | `--lang` | Language for the spellchecker (default: `en`) |
 | `--quiet` | Only log to file (useful for autostart setups) |
 
+### Flushing on Demand
+
+Normally the buffer is released once you stop typing for the configured pause. Pressing **`Enter`** releases it right away instead, with no wait at all, and the newline is delivered after the text — so in a chat window your message is typed out and sent in one go.
+
+This also overrides the hold that keeps an unfinished `en:` prefix in the buffer, and it survives the AI paths: the `Enter` is re-attached after translation or proofreading rather than being swallowed when those strip surrounding whitespace.
+
 ### Pause & Resume Shortcut
 
 Press **`Ctrl+Shift+Space`** at any time to pause or resume masking. The tray icon switches colour to reflect the current state, and pausing clears whatever is still sitting in the buffer.

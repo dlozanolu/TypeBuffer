@@ -374,6 +374,9 @@ class TypeBufferApp:
         self._toggle_requested = False
         self._hotkey_spec: str | None = None
         self._hotkey_parsed: tuple[frozenset[str], int] | None = None
+        # Set by Enter to release the buffer without waiting for the idle timeout.
+        self._flush_now = False
+        self._wake = threading.Event()
 
     @property
     def timeout(self) -> float:
@@ -468,6 +471,7 @@ class TypeBufferApp:
 
     def stop(self) -> None:
         self.running = False
+        self._wake.set()
 
     def _push(self, text: str) -> None:
         text = _sanitize_chars(text)
@@ -476,6 +480,12 @@ class TypeBufferApp:
         with self.lock:
             self.buffer.extend(text)
             self.last_type_time = time.time()
+
+    def _request_flush(self) -> None:
+        """Releases the buffer on the next loop pass, skipping the idle timeout."""
+        with self.lock:
+            self._flush_now = True
+        self._wake.set()
 
     def _backspace(self) -> bool:
         with self.lock:
@@ -488,24 +498,31 @@ class TypeBufferApp:
     def _take_flush(self) -> str | None:
         with self.lock:
             if not self.buffer:
+                self._flush_now = False
                 return None
 
             current_text = "".join(self.buffer)
             now = time.time()
             elapsed = now - self.last_type_time
+            forced = self._flush_now
 
             # Translation mode handling:
             # If the user is typing a translation prefix (e.g. 'en:' or '{es]:'),
             # DO NOT flush prematurely while only the prefix is typed!
             # Keep buffering until the user types the message to translate.
-            if app_config.get("translate", True) and is_translation_prefix(current_text):
+            if (
+                not forced
+                and app_config.get("translate", True)
+                and is_translation_prefix(current_text)
+            ):
                 has_content = detect_translation(current_text) is not None
                 if not has_content:
                     # Incomplete prefix; do not flush unless idle for 5 seconds fallback.
                     if elapsed < 5.0:
                         return None
 
-            if elapsed > self.timeout:
+            if forced or elapsed > self.timeout:
+                self._flush_now = False
                 texto = _sanitize_chars(current_text)
                 self.buffer.clear()
                 return texto or None
@@ -549,14 +566,9 @@ class TypeBufferApp:
             return True
 
         if vk == VK_RETURN:
-            # If in translation mode and there is text to translate, pressing Enter triggers immediate translation flush.
-            with self.lock:
-                current = "".join(self.buffer)
-                if app_config.get("translate", True) and is_translation_prefix(current):
-                    if detect_translation(current):
-                        self.last_type_time = 0
-                        return True
+            # Enter releases the buffer straight away, no idle wait.
             self._push("\n")
+            self._request_flush()
             return True
         if vk == VK_TAB:
             self._push("\t")
@@ -712,13 +724,8 @@ class TypeBufferApp:
             if key == keyboard.Key.space:
                 self._push(" ")
             elif key == keyboard.Key.enter:
-                with self.lock:
-                    current = "".join(self.buffer)
-                    if app_config.get("translate", True) and is_translation_prefix(current):
-                        if detect_translation(current):
-                            self.last_type_time = 0
-                            return
                 self._push("\n")
+                self._request_flush()
             elif key == keyboard.Key.tab:
                 self._push("\t")
             elif key == keyboard.Key.backspace:
@@ -737,23 +744,28 @@ class TypeBufferApp:
         if texto.strip() == "" and "\n" not in texto and "\t" not in texto:
             return
 
+        # Both AI paths strip surrounding whitespace, which would eat the Enter
+        # that triggered the flush. Keep it aside and re-attach it afterwards.
+        body = texto.rstrip("\n")
+        trailing = texto[len(body):]
+
         # 1) Translation mode: "en: some text" -> translate via AI.
         if app_config.get("translate", True):
-            translated = translate_text(texto, timeout=self.corrector_timeout)
+            translated = translate_text(body, timeout=self.corrector_timeout)
             if translated is not None:
-                logging.info("Sending (translated): %r", translated)
-                self._type_text(translated)
+                logging.info("Sending (translated): %r", translated + trailing)
+                self._type_text(translated + trailing)
                 return
 
         # 2) Spellchecker.
         if app_config.get("spellcheck", False) and self.corrector not in ("none", "off", "no"):
             logging.info("Checking (%s, %s)...", self.corrector, self.language)
             texto = correct_text(
-                texto,
+                body,
                 provider=self.corrector,
                 language=self.language,
                 timeout=self.corrector_timeout,
-            )
+            ) + trailing
 
         logging.info("Sending: %r", texto)
         self._type_text(texto)
@@ -779,7 +791,9 @@ class TypeBufferApp:
 
         try:
             while self.running:
-                time.sleep(0.05)
+                # Woken immediately by Enter; otherwise polls for the idle timeout.
+                self._wake.wait(0.05)
+                self._wake.clear()
 
                 if self._toggle_requested:
                     self._toggle_requested = False
