@@ -200,6 +200,18 @@ _HOTKEY_VK_NAMES.update({f"f{i}": VK_F1 + i - 1 for i in range(1, 25)})
 # Keys that are safe to use on their own, without any modifier.
 _STANDALONE_SAFE_VK = frozenset({VK_PAUSE, VK_SCROLL, *range(VK_F1, VK_F24 + 1)})
 
+# Ctrl shortcuts that must run *after* the buffer lands, or their result shows up
+# ahead of the text the user had already typed. Ctrl+V and Ctrl+Shift+V paste.
+_FLUSH_BEFORE_VK = frozenset({ord("V")})
+
+_MODIFIER_STATE_VK = {"ctrl": VK_CONTROL, "shift": VK_SHIFT, "alt": VK_MENU, "win": VK_LWIN}
+_MODIFIER_INJECT_VK = {"ctrl": VK_LCONTROL, "shift": VK_LSHIFT, "alt": VK_LMENU, "win": VK_LWIN}
+
+# Command modifiers that must be lifted while text is injected, or the receiving
+# app reads the characters as shortcuts (Ctrl+A, Alt mnemonics, Win+key) instead
+# of as text. Shift is left alone: Unicode injection already ignores it.
+_COMMAND_MODIFIER_VK = (VK_LCONTROL, VK_RCONTROL, VK_LMENU, VK_RMENU, VK_LWIN, VK_RWIN)
+
 
 def parse_hotkey(spec: str) -> tuple[frozenset[str], int] | None:
     """
@@ -241,6 +253,10 @@ def _win_send_text(text: str) -> None:
     character itself, so the keyboard state cannot alter it. Enter and Tab
     still need real keys, since apps act on the keystroke rather than the
     control character.
+
+    Unicode injection fixes the character but not its meaning: a Ctrl the user is
+    still holding turns the text into a burst of shortcuts. Command modifiers are
+    therefore lifted for the duration and put back afterwards.
     """
     user32 = ctypes.windll.user32
     events: list[INPUT] = []
@@ -255,6 +271,10 @@ def _win_send_text(text: str) -> None:
         add(vk, scan, 0)
         add(vk, scan, KEYEVENTF_KEYUP)
 
+    held = [vk for vk in _COMMAND_MODIFIER_VK if _down(vk)]
+    for mod_vk in held:
+        add(mod_vk, user32.MapVirtualKeyW(mod_vk, MAPVK_VK_TO_VSC), KEYEVENTF_KEYUP)
+
     for ch in text:
         if ch == "\n":
             add_key(VK_RETURN)
@@ -268,11 +288,54 @@ def _win_send_text(text: str) -> None:
                 add(0, unit, KEYEVENTF_UNICODE)
                 add(0, unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP)
 
+    # Put back whatever the user is still physically holding.
+    for mod_vk in reversed(held):
+        add(mod_vk, user32.MapVirtualKeyW(mod_vk, MAPVK_VK_TO_VSC), 0)
+
     # Sent in chunks so very long AI-corrected paragraphs are not dropped.
     for start in range(0, len(events), 256):
         chunk = events[start : start + 256]
         array = (INPUT * len(chunk))(*chunk)
         user32.SendInput(len(chunk), ctypes.byref(array), ctypes.sizeof(INPUT))
+
+
+def _win_send_combo(mods: frozenset[str], vk: int) -> None:
+    """
+    Replays a shortcut such as Ctrl+V on Windows.
+
+    Only the modifiers the user has already released are pressed, so the real
+    keyboard state is left exactly as it was found. Injecting a key-up for a
+    physically held Ctrl would make Windows report it as released.
+    """
+    user32 = ctypes.windll.user32
+    events: list[INPUT] = []
+
+    def add(key_vk: int, flags: int) -> None:
+        item = INPUT(type=INPUT_KEYBOARD)
+        item.ki = _KEYBDINPUT(
+            wVk=key_vk,
+            wScan=user32.MapVirtualKeyW(key_vk, MAPVK_VK_TO_VSC),
+            dwFlags=flags,
+            time=0,
+            dwExtraInfo=0,
+        )
+        events.append(item)
+
+    missing = [
+        _MODIFIER_INJECT_VK[name]
+        for name in ("ctrl", "shift", "alt", "win")
+        if name in mods and not _down(_MODIFIER_STATE_VK[name])
+    ]
+
+    for mod_vk in missing:
+        add(mod_vk, 0)
+    add(vk, 0)
+    add(vk, KEYEVENTF_KEYUP)
+    for mod_vk in reversed(missing):
+        add(mod_vk, KEYEVENTF_KEYUP)
+
+    array = (INPUT * len(events))(*events)
+    user32.SendInput(len(events), ctypes.byref(array), ctypes.sizeof(INPUT))
 
 
 def setup_logging(quiet: bool) -> None:
@@ -379,6 +442,8 @@ class TypeBufferApp:
         # Set by Enter to release the buffer without waiting for the idle timeout.
         self._flush_now = False
         self._wake = threading.Event()
+        # Shortcut swallowed by the hook, to be replayed once the buffer lands.
+        self._replay_shortcut: tuple[frozenset[str], int] | None = None
 
     @property
     def timeout(self) -> float:
@@ -464,6 +529,45 @@ class TypeBufferApp:
             and ("alt" in mods) == _down(VK_MENU)
             and ("win" in mods) == (_down(VK_LWIN) or _down(VK_RWIN))
         )
+
+    def _defer_shortcut(self, vk: int) -> bool:
+        """
+        Holds back a paste until the buffer has been released.
+
+        Ctrl+V normally passes straight through, so the clipboard contents land
+        before the text still sitting in the buffer. Swallowing the keystroke and
+        replaying it after the flush restores the order the user typed in.
+        """
+        if vk not in _FLUSH_BEFORE_VK:
+            return False
+        if not _down(VK_CONTROL):
+            return False
+        # AltGr reports as Ctrl+Alt on international layouts, and Win+V is a
+        # different shortcut altogether.
+        if _down(VK_MENU) or _down(VK_LWIN) or _down(VK_RWIN):
+            return False
+
+        with self.lock:
+            if not self.buffer:
+                # Nothing pending, so there is no ordering problem to fix.
+                return False
+
+        mods = {"ctrl"}
+        if _down(VK_SHIFT):
+            mods.add("shift")
+        self._replay_shortcut = (frozenset(mods), vk)
+        self._request_flush()
+        return True
+
+    def _replay_pending_shortcut(self) -> None:
+        pending = self._replay_shortcut
+        if pending is None:
+            return
+        self._replay_shortcut = None
+        mods, vk = pending
+        logging.info("Replaying %s+%s after the flush", "+".join(sorted(mods)), chr(vk))
+        if sys.platform == "win32":
+            _win_send_combo(mods, vk)
 
     def _apply_toggle_request(self) -> None:
         if self._on_toggle_request:
@@ -552,6 +656,9 @@ class TypeBufferApp:
 
         if vk in _PASSTHROUGH_VK:
             return False
+
+        if self._defer_shortcut(vk):
+            return True
 
         if self._modifier_passthrough():
             return False
@@ -810,6 +917,8 @@ class TypeBufferApp:
                 texto = self._take_flush()
                 if texto is not None:
                     self._prepare_and_type(texto)
+                # Runs after the text has landed, so a paste keeps its place.
+                self._replay_pending_shortcut()
         except KeyboardInterrupt:
             self.running = False
         finally:

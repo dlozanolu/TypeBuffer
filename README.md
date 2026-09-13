@@ -95,6 +95,8 @@ Normally the buffer is released once you stop typing for the configured pause. P
 
 This also overrides the hold that keeps an unfinished `en:` prefix in the buffer, and it survives the AI paths: the `Enter` is re-attached after translation or proofreading rather than being swallowed when those strip surrounding whitespace.
 
+**`Ctrl+V`** does the same before pasting. Other shortcuts pass straight through, but a paste that arrives while text is still buffered would land ahead of what you already typed. The keystroke is therefore swallowed, the buffer is released, and the paste is replayed immediately afterwards, so the clipboard contents end up where you expect them. When the buffer is empty there is nothing to reorder and `Ctrl+V` is left untouched.
+
 ### Pause & Resume Shortcut
 
 Press **`Ctrl+Shift+Space`** at any time to pause or resume masking. The tray icon switches colour to reflect the current state, and pausing clears whatever is still sitting in the buffer.
