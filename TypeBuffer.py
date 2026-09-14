@@ -22,6 +22,7 @@ from pathlib import Path
 
 from corrector import correct_text, translate_text, is_translation_prefix, detect_translation
 from config import config as app_config
+from overlay import ZenOverlay
 from updater import check_for_update, is_packaged_build
 from version import __version__
 
@@ -444,6 +445,8 @@ class TypeBufferApp:
         self._wake = threading.Event()
         # Shortcut swallowed by the hook, to be replayed once the buffer lands.
         self._replay_shortcut: tuple[frozenset[str], int] | None = None
+        # Ambient fullscreen overlay for distraction-free typing.
+        self._overlay: ZenOverlay | None = None
 
     @property
     def timeout(self) -> float:
@@ -505,6 +508,7 @@ class TypeBufferApp:
         if not active:
             with self.lock:
                 self.buffer.clear()
+            self._overlay_end()
         logging.info("TypeBuffer %s", "ACTIVE" if active else "PAUSED")
 
     def set_on_stop(self, callback) -> None:
@@ -578,14 +582,40 @@ class TypeBufferApp:
     def stop(self) -> None:
         self.running = False
         self._wake.set()
+        self._overlay_stop()
+
+    def _overlay_start(self, text: str) -> None:
+        if app_config.get("zen_overlay", False):
+            if self._overlay is None:
+                self._overlay = ZenOverlay()
+            self._overlay.on_typing_start(text)
+
+    def _overlay_update(self, text: str) -> None:
+        if self._overlay is not None and app_config.get("zen_overlay", False):
+            self._overlay.on_typing_update(text)
+
+    def _overlay_end(self) -> None:
+        if self._overlay is not None:
+            self._overlay.on_typing_end()
+
+    def _overlay_stop(self) -> None:
+        if self._overlay is not None:
+            self._overlay.stop()
+            self._overlay = None
 
     def _push(self, text: str) -> None:
         text = _sanitize_chars(text)
         if not text:
             return
         with self.lock:
+            first_key = len(self.buffer) == 0
             self.buffer.extend(text)
+            current = "".join(self.buffer)
             self.last_type_time = time.time()
+        if first_key:
+            self._overlay_start(current)
+        else:
+            self._overlay_update(current)
 
     def _request_flush(self) -> None:
         """Releases the buffer on the next loop pass, skipping the idle timeout."""
@@ -597,7 +627,9 @@ class TypeBufferApp:
         with self.lock:
             if self.buffer:
                 self.buffer.pop()
+                current = "".join(self.buffer)
                 self.last_type_time = time.time()
+                self._overlay_update(current)
                 return True
             return False
 
@@ -631,6 +663,7 @@ class TypeBufferApp:
                 self._flush_now = False
                 texto = _sanitize_chars(current_text)
                 self.buffer.clear()
+                self._overlay_end()
                 return texto or None
 
             return None
@@ -923,6 +956,7 @@ class TypeBufferApp:
             self.running = False
         finally:
             self.running = False
+            self._overlay_stop()
             if sys.platform == "win32":
                 self._stop_windows()
             elif self._pynput_listener is not None:

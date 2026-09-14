@@ -62,6 +62,11 @@ class TrayIcon:
                 self.toggle_active,
                 default=True,
             ),
+            item(
+                'Zen Focus Overlay',
+                self.toggle_zen_overlay,
+                checked=lambda it: config.get("zen_overlay", False),
+            ),
             pystray.Menu.SEPARATOR,
         ]
         if self.update_info:
@@ -89,6 +94,11 @@ class TrayIcon:
 
     def toggle_active(self, icon=None, item=None):
         self.set_active(not self.is_active)
+
+    def toggle_zen_overlay(self, icon=None, item=None):
+        new_val = not config.get("zen_overlay", False)
+        config.set("zen_overlay", new_val)
+        self.update_menu()
 
     def set_active(self, active: bool):
         self.is_active = active

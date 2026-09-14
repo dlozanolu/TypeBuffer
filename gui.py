@@ -20,7 +20,7 @@ class SettingsWindow:
 
         self.root = tk.Tk()
         self.root.title("TypeBuffer Settings" if not is_welcome else "Welcome to TypeBuffer")
-        self.root.geometry("500x730")
+        self.root.geometry("500x760")
         self.root.resizable(False, False)
 
         # Center window
@@ -111,6 +111,14 @@ class SettingsWindow:
             lf_general,
             text="Check for new versions on startup",
             variable=self.check_updates_var,
+        ).pack(anchor=tk.W, pady=2)
+
+        # Zen Focus Overlay
+        self.zen_overlay_var = tk.BooleanVar(value=config.get("zen_overlay", False))
+        ttk.Checkbutton(
+            lf_general,
+            text="Enable Zen Focus Overlay (ambient typewriter display)",
+            variable=self.zen_overlay_var,
         ).pack(anchor=tk.W, pady=2)
 
         # AI Providers
@@ -245,6 +253,7 @@ class SettingsWindow:
         config.set("spellcheck", self.spellcheck_var.get())
         config.set("translate", self.translate_var.get())
         config.set("check_updates", self.check_updates_var.get())
+        config.set("zen_overlay", self.zen_overlay_var.get())
 
         # Update active provider
         config.set("ai_provider", self._current_provider_key)

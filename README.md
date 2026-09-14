@@ -97,6 +97,18 @@ This also overrides the hold that keeps an unfinished `en:` prefix in the buffer
 
 **`Ctrl+V`** does the same before pasting. Other shortcuts pass straight through, but a paste that arrives while text is still buffered would land ahead of what you already typed. The keystroke is therefore swallowed, the buffer is released, and the paste is replayed immediately afterwards, so the clipboard contents end up where you expect them. When the buffer is empty there is nothing to reorder and `Ctrl+V` is left untouched.
 
+### Zen Focus Overlay
+
+For writers who prefer a dedicated, ambient, distraction-free environment rather than complete blind typing, TypeBuffer includes an optional **Zen Focus Overlay**:
+
+- **Activates smoothly on your first keystroke**: A fullscreen, frameless canvas appears with a subtle fade-in transition (160ms), floating on top of your work without stealing keyboard focus or interrupting your active application.
+- **Dynamic ambient background & contrast**: Before appearing, it instantly samples the average RGB color of the active monitor and computes its perceived luminance (\(0.299R + 0.587G + 0.114B\)). If your screen is bright, it selects a soothing light background with dark `#141414` text; if your screen is dark, it applies a deep charcoal background with light `#F0F0F0` text, protecting against eye strain and flicker.
+- **Retro typewriter typography**: Your typing appears centered in real time with an elegant monospaced font (`Consolas` / `Courier New`) at large 32pt size, wrapping comfortably as sentences flow.
+- **Seamless fade-out**: When you finish a thought and the buffer flushes (by pausing or pressing `Enter`/`Ctrl+V`), the overlay fades out smoothly and your polished text is delivered directly into your active editor, chat, or document.
+- **Zero focus interference**: Configured with Win32 `WS_EX_NOACTIVATE` and `WS_EX_TRANSPARENT`, mouse clicks pass right through, and typing focus remains locked to your target window.
+
+You can toggle it anytime from the system tray menu (**Zen Focus Overlay**) or in *Settings → General Settings*.
+
 ### Pause & Resume Shortcut
 
 Press **`Ctrl+Shift+Space`** at any time to pause or resume masking. The tray icon switches colour to reflect the current state, and pausing clears whatever is still sitting in the buffer.
