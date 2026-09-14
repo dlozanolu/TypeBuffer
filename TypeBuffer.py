@@ -447,6 +447,8 @@ class TypeBufferApp:
         self._replay_shortcut: tuple[frozenset[str], int] | None = None
         # Ambient fullscreen overlay for distraction-free typing.
         self._overlay: ZenOverlay | None = None
+        # Suppressed when the buffer begins with Tab (e.g. navigation or indentation).
+        self._overlay_suppressed = False
 
     @property
     def timeout(self) -> float:
@@ -508,6 +510,7 @@ class TypeBufferApp:
         if not active:
             with self.lock:
                 self.buffer.clear()
+            self._overlay_suppressed = False
             self._overlay_end()
         logging.info("TypeBuffer %s", "ACTIVE" if active else "PAUSED")
 
@@ -582,16 +585,20 @@ class TypeBufferApp:
     def stop(self) -> None:
         self.running = False
         self._wake.set()
+        self._overlay_suppressed = False
         self._overlay_stop()
 
     def _overlay_start(self, text: str) -> None:
-        if app_config.get("zen_overlay", False):
+        if app_config.get("zen_overlay", False) and not self._overlay_suppressed:
+            if text.startswith("\t"):
+                self._overlay_suppressed = True
+                return
             if self._overlay is None:
                 self._overlay = ZenOverlay()
             self._overlay.on_typing_start(text)
 
     def _overlay_update(self, text: str) -> None:
-        if self._overlay is not None and app_config.get("zen_overlay", False):
+        if self._overlay is not None and app_config.get("zen_overlay", False) and not self._overlay_suppressed:
             self._overlay.on_typing_update(text)
 
     def _overlay_end(self) -> None:
@@ -613,9 +620,14 @@ class TypeBufferApp:
             current = "".join(self.buffer)
             self.last_type_time = time.time()
         if first_key:
-            self._overlay_start(current)
+            if current.startswith("\t"):
+                self._overlay_suppressed = True
+            else:
+                self._overlay_suppressed = False
+                self._overlay_start(current)
         else:
-            self._overlay_update(current)
+            if not self._overlay_suppressed:
+                self._overlay_update(current)
 
     def _request_flush(self) -> None:
         """Releases the buffer on the next loop pass, skipping the idle timeout."""
@@ -629,7 +641,10 @@ class TypeBufferApp:
                 self.buffer.pop()
                 current = "".join(self.buffer)
                 self.last_type_time = time.time()
-                self._overlay_update(current)
+                if not self.buffer:
+                    self._overlay_suppressed = False
+                if not self._overlay_suppressed:
+                    self._overlay_update(current)
                 return True
             return False
 
@@ -663,6 +678,7 @@ class TypeBufferApp:
                 self._flush_now = False
                 texto = _sanitize_chars(current_text)
                 self.buffer.clear()
+                self._overlay_suppressed = False
                 self._overlay_end()
                 return texto or None
 
