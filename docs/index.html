@@ -352,6 +352,194 @@
             font-weight: bold;
         }
 
+        /* Zen Focus Overlay Showcase */
+        .zen-showcase {
+            background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 2.5rem;
+            margin: 3rem 0 3.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .zen-showcase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .zen-showcase-title {
+            max-width: 600px;
+        }
+
+        .zen-showcase-title h3 {
+            font-size: 1.7rem;
+            color: #ffffff;
+            margin: 0 0 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .zen-showcase-title p {
+            color: var(--text-muted);
+            margin: 0;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .zen-mode-switcher {
+            display: flex;
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .zen-mode-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.45rem 0.95rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .zen-mode-btn:hover {
+            color: #ffffff;
+        }
+
+        .zen-mode-btn.active {
+            background-color: var(--card-bg);
+            color: #ffffff;
+            border: 1px solid var(--card-hover-border);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .zen-viewport {
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem 2rem;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .zen-viewport.dark-ambient {
+            background-color: #1a1c22;
+        }
+
+        .zen-viewport.light-ambient {
+            background-color: #f4f3ed;
+        }
+
+        .zen-tag-indicator {
+            position: absolute;
+            top: 1rem;
+            left: 1.25rem;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            transition: color 0.3s ease;
+        }
+
+        .zen-viewport.dark-ambient .zen-tag-indicator {
+            color: #8b949e;
+        }
+
+        .zen-viewport.light-ambient .zen-tag-indicator {
+            color: #656d76;
+        }
+
+        .zen-tag-indicator .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--success);
+            display: inline-block;
+        }
+
+        .zen-display-text {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+            font-size: 1.85rem;
+            line-height: 1.5;
+            text-align: center;
+            max-width: 720px;
+            margin: 0;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            transition: color 0.3s ease;
+        }
+
+        .zen-viewport.dark-ambient .zen-display-text {
+            color: #F0F0F0;
+        }
+
+        .zen-viewport.light-ambient .zen-display-text {
+            color: #141414;
+        }
+
+        .zen-cursor {
+            display: inline-block;
+            width: 3px;
+            height: 1.3em;
+            vertical-align: middle;
+            margin-left: 4px;
+            background-color: currentColor;
+            animation: zen-blink 1s infinite;
+        }
+
+        @keyframes zen-blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        .zen-meta-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.25rem;
+            margin-top: 1.75rem;
+        }
+
+        .zen-meta-item {
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.15rem;
+        }
+
+        .zen-meta-item strong {
+            display: block;
+            font-size: 0.92rem;
+            color: #ffffff;
+            margin-bottom: 0.35rem;
+        }
+
+        .zen-meta-item span {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            display: block;
+        }
+
         /* Secondary Features Grid */
         .features-grid {
             display: grid;
@@ -516,11 +704,11 @@
 <body>
 
 <header>
-    <div class="badge">✨ Real-Time AI Translation & Masked Input</div>
+    <div class="badge">✨ Real-Time AI Translation · Kinesthetic Blind Flow · Zen Focus Overlay</div>
     <h1>TypeBuffer</h1>
     <p class="tagline">Type at the speed of thought. Translate and polish at the speed of AI.</p>
     <p class="hero-desc">
-        Write blindly into a silent buffer without visual distractions. Pause for 0.3 seconds, and watch your thoughts land cleanly on screen—translated, proofread, and distraction-free.
+        Write silently into a distraction-free buffer—or immerse yourself in the ambient typewriter Zen Overlay. Pause for 0.3s, and watch your thoughts land cleanly on screen: translated, proofread, and ready.
     </p>
     <div class="btn-group">
         <a href="https://github.com/dlozanolu/TypeBuffer/releases" class="btn">Download Latest Release</a>
@@ -629,6 +817,49 @@
         </div>
     </div>
 
+    <!-- Zen Focus Overlay Showcase -->
+    <section class="zen-showcase">
+        <div class="zen-showcase-header">
+            <div class="zen-showcase-title">
+                <h3>🪟 Ambient Zen Focus Overlay</h3>
+                <p>An optional fullscreen typewriter canvas that awakens smoothly as you type and dissolves upon release. It dynamically adapts its background to your screen's ambient luminance so you write in pure, glare-free comfort.</p>
+            </div>
+            <div class="zen-mode-switcher">
+                <button class="zen-mode-btn active" id="btn-dark-zen" onclick="setZenMode('dark')">🌙 Dark Ambient</button>
+                <button class="zen-mode-btn" id="btn-light-zen" onclick="setZenMode('light')">☀️ Light Ambient</button>
+            </div>
+        </div>
+
+        <div class="zen-viewport dark-ambient" id="zen-viewport">
+            <div class="zen-tag-indicator">
+                <span class="dot"></span>
+                <span id="zen-indicator-text">Ambient Luminance Matched · WS_EX_NOACTIVATE Active</span>
+            </div>
+            <p class="zen-display-text" id="zen-text">
+                <span id="zen-typed-content">Ideas flow directly into the keyboard without visual evaluation</span><span class="zen-cursor"></span>
+            </p>
+        </div>
+
+        <div class="zen-meta-row">
+            <div class="zen-meta-item">
+                <strong>⚡ &lt;30ms Hardware Luminance</strong>
+                <span>Samples the active display using Win32 GDI StretchBlt (0.299R + 0.587G + 0.114B) to eliminate harsh visual glare.</span>
+            </div>
+            <div class="zen-meta-item">
+                <strong>🎯 Zero Focus Interruption</strong>
+                <span>Built with WS_EX_NOACTIVATE & WS_EX_TRANSPARENT. Your target editor, terminal, or browser never loses keyboard focus.</span>
+            </div>
+            <div class="zen-meta-item">
+                <strong>⌨️ Smart Tab & Flush Flow</strong>
+                <span>Enter and Ctrl+V release instantly. Pressing Tab as the first key suppresses the overlay, keeping field navigation uninterrupted.</span>
+            </div>
+            <div class="zen-meta-item">
+                <strong>🧘 Elegant Typewriter Aesthetics</strong>
+                <span>Centered 32pt monospace typography with 160ms fluid fade-in and fade-out transitions upon buffer release.</span>
+            </div>
+        </div>
+    </section>
+
     <!-- Additional Features -->
     <div class="section-header">
         <h2>Engineered for Daily Frictionless Work</h2>
@@ -716,6 +947,71 @@
         Open Source under the <a href="https://github.com/dlozanolu/TypeBuffer/blob/main/LICENSE">MIT License</a> · Created by <a href="https://wealthreader.com/" target="_blank" rel="noopener noreferrer">David Lozano Lucas</a>.
     </p>
 </footer>
+
+<script>
+    function setZenMode(mode) {
+        var vp = document.getElementById('zen-viewport');
+        var btnDark = document.getElementById('btn-dark-zen');
+        var btnLight = document.getElementById('btn-light-zen');
+        var indicator = document.getElementById('zen-indicator-text');
+
+        if (mode === 'light') {
+            vp.classList.remove('dark-ambient');
+            vp.classList.add('light-ambient');
+            btnLight.classList.add('active');
+            btnDark.classList.remove('active');
+            indicator.textContent = 'High Ambient Luminance (>128) · Dark #141414 Text · Soft Light Canvas';
+        } else {
+            vp.classList.remove('light-ambient');
+            vp.classList.add('dark-ambient');
+            btnDark.classList.add('active');
+            btnLight.classList.remove('active');
+            indicator.textContent = 'Low Ambient Luminance (≤128) · Light #F0F0F0 Text · Deep Charcoal Canvas';
+        }
+    }
+
+    // Typewriter simulation effect for the showcase
+    (function initTypewriterSimulation() {
+        var phrases = [
+            "Ideas flow directly into the keyboard without visual evaluation",
+            "Typing at the speed of thought with eyes resting in pure focus",
+            "Pause for a moment, and your words land cleanly in your app"
+        ];
+        var el = document.getElementById('zen-typed-content');
+        if (!el) return;
+
+        var phraseIndex = 0;
+        var charIndex = phrases[0].length;
+        var isDeleting = false;
+
+        function tick() {
+            var currentPhrase = phrases[phraseIndex];
+
+            if (isDeleting) {
+                charIndex--;
+                el.textContent = currentPhrase.substring(0, charIndex);
+                if (charIndex <= 0) {
+                    isDeleting = false;
+                    phraseIndex = (phraseIndex + 1) % phrases.length;
+                    setTimeout(tick, 500);
+                    return;
+                }
+                setTimeout(tick, 25);
+            } else {
+                charIndex++;
+                el.textContent = currentPhrase.substring(0, charIndex);
+                if (charIndex >= currentPhrase.length) {
+                    isDeleting = true;
+                    setTimeout(tick, 3500); // Pause to let reader appreciate the text
+                    return;
+                }
+                setTimeout(tick, 45);
+            }
+        }
+
+        setTimeout(tick, 2000);
+    })();
+</script>
 
 </body>
 </html>
