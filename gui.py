@@ -2,7 +2,7 @@ import copy
 import sys
 import threading
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 from config import config
 
@@ -155,6 +155,9 @@ class SettingsWindow:
         )
         self.provider_cb.pack(side=tk.RIGHT)
         self.provider_cb.bind("<<ComboboxSelected>>", self.on_provider_change)
+        ttk.Button(provider_frame, text="Add provider...", command=self.add_provider).pack(
+            side=tk.RIGHT, padx=(0, 5)
+        )
 
         # Provider Config Fields
         self.prov_config_frame = ttk.Frame(lf_ai)
@@ -171,6 +174,12 @@ class SettingsWindow:
         self.apikey_var = tk.StringVar(value=initial_data.get("api_key", ""))
         ttk.Entry(self.prov_config_frame, textvariable=self.apikey_var, width=45, show="*").grid(
             row=1, column=1, sticky=tk.E, pady=2
+        )
+
+        ttk.Label(self.prov_config_frame, text="Model:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        self.model_var = tk.StringVar(value=initial_data.get("model", ""))
+        ttk.Entry(self.prov_config_frame, textvariable=self.model_var, width=45).grid(
+            row=2, column=1, sticky=tk.E, pady=2
         )
 
         # Save Button
@@ -195,8 +204,10 @@ class SettingsWindow:
         # If switching away from a different provider, persist its current input fields
         if hasattr(self, "_current_provider_key") and self._current_provider_key != matched_key:
             if self._current_provider_key in self.providers:
-                self.providers[self._current_provider_key]["endpoint"] = self.endpoint_var.get().strip()
-                self.providers[self._current_provider_key]["api_key"] = self.apikey_var.get().strip()
+                prov = self.providers[self._current_provider_key]
+                prov["endpoint"] = self.endpoint_var.get().strip()
+                prov["api_key"] = self.apikey_var.get().strip()
+                prov["model"] = self.model_var.get().strip()
 
         self._current_provider_key = matched_key
         prov_data = self.providers.get(matched_key, {})
@@ -205,6 +216,33 @@ class SettingsWindow:
             self.active_provider_var.set(canonical_name)
         self.endpoint_var.set(prov_data.get("endpoint", ""))
         self.apikey_var.set(prov_data.get("api_key", ""))
+        self.model_var.set(prov_data.get("model", ""))
+
+    def add_provider(self, event=None):
+        """Registers a custom OpenAI-compatible endpoint (name + endpoint + key + model)."""
+        name = simpledialog.askstring(
+            "New provider", "Provider name (e.g. Groq):", parent=self.root
+        )
+        if not name or not name.strip():
+            return
+        name = name.strip()
+        key = "".join(ch for ch in name.lower() if ch.isalnum()) or "custom"
+        base_key, n = key, 2
+        while key in self.providers:
+            key = f"{base_key}{n}"
+            n += 1
+        self.providers[key] = {
+            "name": name,
+            "type": "openai",
+            "endpoint": "",
+            "api_key": "",
+            "model": "",
+        }
+        self.provider_cb.configure(
+            values=[v.get("name", k) for k, v in self.providers.items()]
+        )
+        self.active_provider_var.set(name)
+        self.on_provider_change()
 
     def _validate_timeout(self, event=None):
         try:
@@ -244,8 +282,10 @@ class SettingsWindow:
 
         # Save current provider changes
         if hasattr(self, "_current_provider_key") and self._current_provider_key in self.providers:
-            self.providers[self._current_provider_key]["endpoint"] = self.endpoint_var.get().strip()
-            self.providers[self._current_provider_key]["api_key"] = self.apikey_var.get().strip()
+            prov = self.providers[self._current_provider_key]
+            prov["endpoint"] = self.endpoint_var.get().strip()
+            prov["api_key"] = self.apikey_var.get().strip()
+            prov["model"] = self.model_var.get().strip()
 
         config.set("timeout", timeout)
         config.set("hotkey_toggle", hotkey)

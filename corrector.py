@@ -21,10 +21,14 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 
 from config import config
+from privacy import redact
 
 log = logging.getLogger(__name__)
+
+ErrorCallback = Callable[[str], None]
 
 LT_PUBLIC = "https://api.languagetool.org/v2/check"
 
@@ -159,7 +163,11 @@ def _has_meaningful_content(text: str) -> bool:
     return any(ch.isalnum() for ch in text)
 
 
-def translate_text(text: str, timeout: float = 8.0) -> str | None:
+def translate_text(
+    text: str,
+    timeout: float = 8.0,
+    on_error: ErrorCallback | None = None,
+) -> str | None:
     """
     Translates text if it matches the "lang: text" pattern.
     Returns the translated string, or None if it is not a translation request.
@@ -177,6 +185,8 @@ def translate_text(text: str, timeout: float = 8.0) -> str | None:
     provider = config.active_provider()
     if provider.get("type") == "languagetool":
         log.warning("Translation requires an AI provider, not LanguageTool.")
+        if on_error:
+            on_error("translation needs an AI provider, not LanguageTool")
         return None
 
     system = (
@@ -187,10 +197,12 @@ def translate_text(text: str, timeout: float = 8.0) -> str | None:
         out = _call_ai(provider, provider_id, system, source, timeout)
     except Exception as exc:
         log.warning("Translation failed (%s); leaving original text", exc)
+        if on_error:
+            on_error(f"translation failed ({exc})")
         return None
 
     out = _strip_quotes(out)
-    log.info("Translation (%s): %r -> %r", code, source, out)
+    log.info("Translation (%s): %s -> %s", code, redact(source), redact(out))
     return out or None
 
 
@@ -200,6 +212,7 @@ def correct_text(
     provider: str | None = None,
     language: str = "en",
     timeout: float = 8.0,
+    on_error: ErrorCallback | None = None,
 ) -> str:
     text = text or ""
     # Never send empty, whitespace-only, or punctuation-only text to the AI.
@@ -215,12 +228,18 @@ def correct_text(
         if cfg.get("type") in ("openai", "anthropic"):
             if not cfg.get("api_key"):
                 log.warning("No API key for %r; falling back to LanguageTool", provider)
+                if on_error:
+                    on_error(f"no API key for {provider}; used LanguageTool instead")
                 return _correct_languagetool(text, language=language, timeout=timeout)
             return _correct_ai(cfg, provider, text, language=language, timeout=timeout)
         log.warning("Unknown provider %r; skipping correction", provider)
+        if on_error:
+            on_error(f"unknown provider {provider}; text was left untouched")
         return text
     except Exception as exc:
         log.warning("Spellchecker failed (%s); returning original text", exc)
+        if on_error:
+            on_error(f"spellcheck failed ({exc})")
         return text
 
 
@@ -239,7 +258,7 @@ def _correct_ai(provider: dict, provider_id: str, text: str, *, language: str, t
     out = _call_ai(provider, provider_id, system, text, timeout)
     out = _strip_quotes(out)
     if out != text:
-        log.info("%s: %r -> %r", provider_id, text, out)
+        log.info("%s: %s -> %s", provider_id, redact(text), redact(out))
     return out or text
 
 
@@ -278,5 +297,5 @@ def _correct_languagetool(text: str, *, language: str, timeout: float) -> str:
         out = out[:start] + replacement + out[end:]
 
     if out != text:
-        log.info("LanguageTool: %r -> %r", text, out)
+        log.info("LanguageTool: %s -> %s", redact(text), redact(out))
     return out

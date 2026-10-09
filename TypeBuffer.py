@@ -13,6 +13,7 @@ import argparse
 import ctypes
 import logging
 import os
+import queue
 import sys
 import threading
 import time
@@ -20,9 +21,10 @@ import unicodedata
 from ctypes import wintypes
 from pathlib import Path
 
-from corrector import correct_text, translate_text, is_translation_prefix, detect_translation
 from config import config as app_config
+from corrector import correct_text, detect_translation, is_translation_prefix, translate_text
 from overlay import ZenOverlay
+from privacy import redact
 from updater import check_for_update, is_packaged_build
 from version import __version__
 
@@ -342,6 +344,11 @@ def _win_send_combo(mods: frozenset[str], vk: int) -> None:
 def setup_logging(quiet: bool) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     handlers: list[logging.Handler] = [logging.FileHandler(LOG_FILE, encoding="utf-8")]
+    try:
+        os.chmod(LOG_DIR, 0o700)
+        os.chmod(LOG_FILE, 0o600)
+    except OSError:
+        pass
     if not quiet:
         handlers.append(logging.StreamHandler(sys.stdout))
     logging.basicConfig(
@@ -445,6 +452,14 @@ class TypeBufferApp:
         self._wake = threading.Event()
         # Shortcut swallowed by the hook, to be replayed once the buffer lands.
         self._replay_shortcut: tuple[frozenset[str], int] | None = None
+        # AI requests run off the run loop so typing, the hotkey and the tray
+        # stay responsive while a provider is answering.
+        self._ai_busy = False
+        self._ai_token: object | None = None
+        self._ai_source: str | None = None
+        self._ai_results: queue.Queue = queue.Queue()
+        self._notify_callback = None
+        self._last_notice_time = 0.0
         # Ambient fullscreen overlay for distraction-free typing.
         self._overlay: ZenOverlay | None = None
         # Suppressed when the buffer begins with Tab (e.g. navigation or indentation).
@@ -510,6 +525,7 @@ class TypeBufferApp:
         if not active:
             with self.lock:
                 self.buffer.clear()
+                self._drop_pending_ai_locked()
             self._overlay_suppressed = False
             self._overlay_end()
         logging.info("TypeBuffer %s", "ACTIVE" if active else "PAUSED")
@@ -520,6 +536,30 @@ class TypeBufferApp:
     def set_on_toggle_request(self, callback) -> None:
         """Routes hotkey toggles through the tray icon so its state stays in sync."""
         self._on_toggle_request = callback
+
+    def set_status_notifier(self, callback) -> None:
+        """Receives user-facing messages (e.g. an AI fallback) from the run loop."""
+        self._notify_callback = callback
+
+    def _notify(self, message: str) -> None:
+        """Best-effort status message, rate-limited so a slow provider never nags."""
+        callback = self._notify_callback
+        if callback is None:
+            return
+        now = time.time()
+        if now - self._last_notice_time < 60.0:
+            return
+        self._last_notice_time = now
+        try:
+            callback(message)
+        except Exception:
+            logging.exception("Status notifier failed")
+
+    def _drop_pending_ai_locked(self) -> None:
+        """Invalidates the in-flight AI task so its result is discarded."""
+        self._ai_busy = False
+        self._ai_token = None
+        self._ai_source = None
 
     def _hotkey_matches(self, vk: int) -> bool:
         parsed = self.hotkey
@@ -584,6 +624,8 @@ class TypeBufferApp:
 
     def stop(self) -> None:
         self.running = False
+        with self.lock:
+            self._drop_pending_ai_locked()
         self._wake.set()
         self._overlay_suppressed = False
         self._overlay_stop()
@@ -649,6 +691,7 @@ class TypeBufferApp:
             return False
 
     def _take_flush(self) -> str | None:
+        aborted_text: str | None = None
         with self.lock:
             if not self.buffer:
                 self._flush_now = False
@@ -658,31 +701,43 @@ class TypeBufferApp:
             now = time.time()
             elapsed = now - self.last_type_time
             forced = self._flush_now
+            ready = forced or elapsed > self.timeout
 
             # Translation mode handling:
             # If the user is typing a translation prefix (e.g. 'en:' or '{es]:'),
             # DO NOT flush prematurely while only the prefix is typed!
             # Keep buffering until the user types the message to translate.
             if (
-                not forced
+                ready
+                and not forced
                 and app_config.get("translate", True)
                 and is_translation_prefix(current_text)
+                and detect_translation(current_text) is None
+                and elapsed < 5.0
             ):
-                has_content = detect_translation(current_text) is not None
-                if not has_content:
-                    # Incomplete prefix; do not flush unless idle for 5 seconds fallback.
-                    if elapsed < 5.0:
-                        return None
+                # Incomplete prefix; do not flush unless idle for 5 seconds fallback.
+                return None
 
-            if forced or elapsed > self.timeout:
-                self._flush_now = False
-                texto = _sanitize_chars(current_text)
-                self.buffer.clear()
-                self._overlay_suppressed = False
-                self._overlay_end()
-                return texto or None
+            if not ready:
+                return None
 
-            return None
+            if self._ai_busy:
+                # The previous flush is still waiting on its provider and the next
+                # text is due now. Deliver the pending text unprocessed instead of
+                # holding the new one hostage; the late AI result is dropped.
+                aborted_text = self._ai_source
+                self._drop_pending_ai_locked()
+
+            self._flush_now = False
+            texto = _sanitize_chars(current_text)
+            self.buffer.clear()
+            self._overlay_suppressed = False
+            self._overlay_end()
+
+        if aborted_text:
+            logging.info("AI still busy; sending the previous text unprocessed")
+            self._inject(aborted_text)
+        return texto or None
 
     def _modifier_passthrough(self) -> bool:
         """True if Ctrl/Alt/Win indicate a system shortcut (not masked typing)."""
@@ -894,6 +949,11 @@ class TypeBufferApp:
         )
         self._pynput_listener.start()
 
+    def _needs_ai(self, texto: str) -> bool:
+        if app_config.get("translate", True) and detect_translation(texto) is not None:
+            return True
+        return app_config.get("spellcheck", False) and self.corrector not in ("none", "off", "no")
+
     def _prepare_and_type(self, texto: str) -> None:
         if not texto:
             return
@@ -902,6 +962,34 @@ class TypeBufferApp:
         if texto.strip() == "" and "\n" not in texto and "\t" not in texto:
             return
 
+        if self._needs_ai(texto):
+            with self.lock:
+                token = object()
+                self._ai_token = token
+                self._ai_source = texto
+                self._ai_busy = True
+            threading.Thread(
+                target=self._ai_task,
+                args=(token, texto),
+                daemon=True,
+                name="ai-worker",
+            ).start()
+            return
+
+        self._inject(texto)
+
+    def _ai_task(self, token: object, texto: str) -> None:
+        errors: list[str] = []
+        try:
+            final = self._process_with_ai(texto, errors.append)
+        except Exception as exc:
+            logging.exception("AI processing failed")
+            errors.append(str(exc))
+            final = texto
+        self._ai_results.put((token, final, errors))
+        self._wake.set()
+
+    def _process_with_ai(self, texto: str, on_error) -> str:
         # Both AI paths strip surrounding whitespace, which would eat the Enter
         # that triggered the flush. Keep it aside and re-attach it afterwards.
         body = texto.rstrip("\n")
@@ -909,23 +997,47 @@ class TypeBufferApp:
 
         # 1) Translation mode: "en: some text" -> translate via AI.
         if app_config.get("translate", True):
-            translated = translate_text(body, timeout=self.corrector_timeout)
+            translated = translate_text(body, timeout=self.corrector_timeout, on_error=on_error)
             if translated is not None:
-                logging.info("Sending (translated): %r", translated + trailing)
-                self._type_text(translated + trailing)
-                return
+                return translated + trailing
 
         # 2) Spellchecker.
         if app_config.get("spellcheck", False) and self.corrector not in ("none", "off", "no"):
             logging.info("Checking (%s, %s)...", self.corrector, self.language)
-            texto = correct_text(
+            return correct_text(
                 body,
                 provider=self.corrector,
                 language=self.language,
                 timeout=self.corrector_timeout,
+                on_error=on_error,
             ) + trailing
 
-        logging.info("Sending: %r", texto)
+        return texto
+
+    def _drain_results(self) -> None:
+        """Collects finished AI tasks; runs on the main loop, in flush order."""
+        while True:
+            try:
+                token, final, errors = self._ai_results.get_nowait()
+            except queue.Empty:
+                return
+            with self.lock:
+                accepted = self._ai_busy and token is self._ai_token
+                if accepted:
+                    self._drop_pending_ai_locked()
+            if not accepted:
+                logging.info("Discarding stale AI result")
+                continue
+            logging.info("AI processing finished")
+            self._inject(final)
+            if errors:
+                reason = errors[0]
+                if len(reason) > 140:
+                    reason = reason[:137] + "..."
+                self._notify(f"AI fallback: {reason}")
+
+    def _inject(self, texto: str) -> None:
+        logging.info("Sending: %s", redact(texto))
         self._type_text(texto)
 
     def run(self) -> None:
@@ -963,11 +1075,16 @@ class TypeBufferApp:
                     if app_config.check_reload():
                         logging.info("Config file changed on disk, reloaded.")
 
+                self._drain_results()
+
                 texto = self._take_flush()
                 if texto is not None:
                     self._prepare_and_type(texto)
+
                 # Runs after the text has landed, so a paste keeps its place.
-                self._replay_pending_shortcut()
+                # While an AI call is still in flight the text has not landed yet.
+                if not self._ai_busy:
+                    self._replay_pending_shortcut()
         except KeyboardInterrupt:
             self.running = False
         finally:
@@ -1075,6 +1192,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         app.set_on_stop(lambda: tray.stop() if tray else None)
         app.set_on_toggle_request(tray.toggle_active)
+        app.set_status_notifier(lambda msg: tray.notify(msg) if tray else None)
     except Exception as exc:
         logging.warning("Could not start the tray icon: %s", exc)
 

@@ -2,8 +2,9 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
-from PIL import Image
+
 import pystray
+from PIL import Image
 from pystray import MenuItem as item
 
 from config import config
@@ -76,17 +77,21 @@ class TrayIcon:
         entries.append(item('Exit', self.exit_app))
         self.icon.menu = pystray.Menu(*entries)
 
+    def notify(self, message: str, title: str = "TypeBuffer") -> None:
+        """Shows a balloon notification; never fails the caller (headless trays)."""
+        try:
+            self.icon.notify(message, title)
+        except Exception as e:
+            print(f"Could not show the notification: {e}")
+
     def announce_update(self, version: str, url: str):
         """Adds a download entry to the menu and shows a one-off notification."""
         self.update_info = (version, url)
         self.update_menu()
-        try:
-            self.icon.notify(
-                f"Version {version} is available. Open the tray menu to download it.",
-                "TypeBuffer update",
-            )
-        except Exception as e:
-            print(f"Could not show the update notification: {e}")
+        self.notify(
+            f"Version {version} is available. Open the tray menu to download it.",
+            "TypeBuffer update",
+        )
 
     def open_update(self, icon=None, item=None):
         if self.update_info:
@@ -131,6 +136,7 @@ class TrayIcon:
 
 if __name__ == "__main__":
     import sys
+
     from single_instance import SingleInstance
 
     single_inst = SingleInstance()

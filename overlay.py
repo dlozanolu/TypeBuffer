@@ -21,9 +21,13 @@ import logging
 import queue
 import sys
 import threading
-import tkinter as tk
-from typing import Tuple
 import warnings
+from typing import Tuple
+
+try:
+    import tkinter as tk
+except Exception:  # headless systems without Tk: the overlay is disabled
+    tk = None
 
 # Suppress harmless Python 3.12+ cross-thread Tcl deallocation warning on shutdown.
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*Tcl interpreter is leaked.*")
@@ -184,6 +188,11 @@ class ZenOverlay:
     # ----------------- Tkinter Thread Implementation -----------------
 
     def _run(self) -> None:
+        if tk is None:
+            logging.warning("Tkinter is unavailable; the Zen Focus Overlay is disabled.")
+            self._ready_event.set()
+            return
+
         self.root = tk.Tk()
         self.root.withdraw()
         self.root.overrideredirect(True)

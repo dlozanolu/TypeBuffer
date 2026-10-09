@@ -16,7 +16,6 @@ import platform
 import sys
 from pathlib import Path
 
-
 APP_NAME = "TypeBuffer"
 ROOT = Path(__file__).resolve().parent
 

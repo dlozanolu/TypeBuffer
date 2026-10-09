@@ -62,6 +62,16 @@ python TypeBuffer.py
 
 On Windows, you can also use `TypeBuffer.bat`.
 
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+ruff check .
+```
+
+CI runs the same commands on Linux and Windows (Python 3.10 and 3.12) for every push and pull request.
+
 > The first time you run it, a **welcome window** opens so you can configure the timeout, autostart, spellchecker, translation, and your AI API keys.
 
 ## Usage
@@ -145,7 +155,9 @@ Predefined providers with their endpoints:
 | DeepSeek  | `https://api.deepseek.com/v1`     | Yes     |
 | LanguageTool | `https://api.languagetool.org/v2/check` | Free (no key) |
 
-You can also register a **custom provider** (name + endpoint + API key + model) if your favorite one is not in the list.
+You can also register a **custom provider** (name + endpoint + API key + model) if your favorite one is not in the list: press **Add provider…** in Settings and fill in its endpoint, key and model.
+
+AI calls run in the background. Typing, the pause/resume shortcut and the tray remain responsive while the provider is answering. If you finish another phrase before the previous one comes back, the pending text is delivered unprocessed instead of holding up the new one, and the tray shows a notification saying the AI step was skipped.
 
 ### Local LanguageTool
 
@@ -201,7 +213,8 @@ Compatible with Windows (Startup folder), Linux (`~/.config/autostart`), and mac
 ```
 TypeBuffer.py         # Main application (keyboard hook + buffer)
 corrector.py          # Spellchecker + translator (multi-provider AI)
-config.py             # Settings storage (config.json)
+config.py             # Settings storage (config.json, DPAPI-protected keys)
+privacy.py            # Log redaction helper
 gui.py                # Welcome & Settings windows (tkinter)
 tray.py               # System tray icon (pystray)
 installer.iss         # Inno Setup Windows installer script
@@ -210,6 +223,8 @@ TypeBuffer.bat        # Windows launcher
 test_tray.bat         # Standalone tray icon test
 build.bat / build.sh  # PyInstaller build scripts
 assets/               # Tray icons (active/inactive)
+tests/                # Unit tests (pytest)
+pyproject.toml        # pytest + ruff configuration
 requirements.txt
 requirements-dev.txt
 ```
@@ -217,6 +232,8 @@ requirements-dev.txt
 ## Privacy
 
 - Masked text only lives in memory until it is flushed.
+- The log (`typebuffer.log`) never contains what you typed: entries record lengths only (e.g. `Sending: <42 chars>`). Log and config files are created with restricted permissions where the OS allows it.
+- API keys are encrypted at rest with Windows DPAPI on Windows, bound to your user account. On Linux/macOS they are stored in plain text inside `config.json`, so keep that file private.
 - With the spellchecker using LanguageTool (default public API), text is sent to LanguageTool.org.
 - With an AI provider (OpenAI/Claude/DeepSeek/custom), text is sent to the configured API endpoint.
 - With `--corrector none` and translation disabled, no network requests are made.
